@@ -1,9 +1,9 @@
 services:
   mssql:
-    build: .
+    image: mcr.microsoft.com/mssql/server:2019-latest
     environment:
       ACCEPT_EULA: y
-      MSSQL_SA_PASSWORD: password
+      MSSQL_SA_PASSWORD: SomeGoodPassword!
       MSSQL_PID: Evaluation
     ports:
       - "1433:1433"
