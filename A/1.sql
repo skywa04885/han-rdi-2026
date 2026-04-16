@@ -43,7 +43,7 @@ SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                        
 FROM MinCompletion
          INNER JOIN Driver ON Driver.DriverId = MinCompletion.DriverId
 WHERE MinCompletion.MinCompletion >= 0.9
-ORDER BY MinCompletion.MinCompletion DESC
+ORDER BY MinCompletion.MinCompletion DESC;
 
 ------------------------------------------------------------------------------------------------------------------------
 -- Option 2
@@ -70,4 +70,4 @@ SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                        
 FROM DriverCompletion
          INNER JOIN Driver ON Driver.DriverId = DriverCompletion.DriverId
 WHERE DriverCompletion.MinCompletion >= 0.9
-ORDER BY DriverCompletion.MinCompletion DESC
+ORDER BY DriverCompletion.MinCompletion DESC;
