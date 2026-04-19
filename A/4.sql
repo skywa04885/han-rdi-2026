@@ -56,7 +56,7 @@ WITH DriverYears
                            , Race.RaceYear
              FROM Driver
                       INNER JOIN Result ON Driver.DriverId = Result.DriverId
-                      INNER fcJOIN Race ON Result.RaceId = Race.RaceId),
+                      INNER JOIN Race ON Result.RaceId = Race.RaceId),
      RecursivePeriods
          AS (SELECT DriverYears.DriverId
                   , DriverYears.DriverName
