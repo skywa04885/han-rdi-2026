@@ -63,8 +63,20 @@ SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                        
 FROM Driver
          INNER JOIN DriverEntry ON DriverEntry.DriverId = Driver.DriverId
          INNER JOIN DriverWin ON DriverWin.DriverId = Driver.DriverId
-         INNER JOIN MergedFormattedPeriod ON MergedFormattedPeriod.DriverId = Driver.DriverId
+         LEFT JOIN MergedFormattedPeriod ON MergedFormattedPeriod.DriverId = Driver.DriverId
 WHERE DriverWin.Wins >= 25
-ORDER BY DriverWin.Wins DESC
+ORDER BY DriverWin.Wins DESC;
 
 -- Option 2
+SELECT DISTINCT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                                    AS Driver
+              , InnerResult.Entries                                                                  AS Entries
+              , InnerResult.Wins                                                                     AS Wins
+              , CONCAT(ROUND((CAST(InnerResult.Wins AS FLOAT) / InnerResult.Entries) * 100, 2), '%') AS Percentage
+FROM Result
+         CROSS APPLY (SELECT COUNT(*) OVER (PARTITION BY InnerResult.DriverId) AS Entries
+                           , COUNT(CASE WHEN InnerResult.Position = 1 THEN 1 END)
+                                   OVER (PARTITION BY InnerResult.DriverId)    AS Wins
+                      FROM Result AS InnerResult
+                      WHERE InnerResult.DriverId = Result.DriverId) AS InnerResult
+         INNER JOIN Driver ON Driver.DriverId = Result.DriverId
+WHERE InnerResult.Wins >= 25
