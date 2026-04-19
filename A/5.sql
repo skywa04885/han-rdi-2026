@@ -12,71 +12,114 @@ WITH DriverEntry
                       INNER JOIN Result ON Result.DriverId = Driver.DriverId
              WHERE Result.Position = 1
              GROUP BY Result.DriverId),
-     DriverSeason
-         AS (SELECT Driver.DriverId
-                  , Race.RaceYear
+     -- Select all the years the drivers took part in.
+     DriverYear
+         AS (SELECT DISTINCT Result.DriverId AS DriverId
+                           , Race.RaceYear   AS RaceYear
              FROM Result
                       INNER JOIN Race ON Race.RaceId = Result.RaceId
-                      INNER JOIN Driver ON Driver.DriverId = Result.DriverId
-             GROUP BY Driver.DriverId, Race.RaceYear),
-     PeriodStart
-         AS (SELECT DriverId
-                  , RaceYear
-                  , LAG(RaceYear) OVER (PARTITION BY DriverId ORDER BY RaceYear) AS PrevYear
-             FROM DriverSeason),
-     PeriodGroup
-         AS (SELECT DriverId
-                  , RaceYear
-                  , PrevYear
-                  , SUM(IIF(PrevYear IS NULL OR RaceYear > PrevYear + 1, 1, 0))
-                        OVER (PARTITION BY DriverId ORDER BY RaceYear) AS PeriodNr
-             FROM PeriodStart),
-     PeriodBound
-         AS (SELECT DriverId
-                  , PeriodNr
-                  , MIN(RaceYear) AS StartYear
-                  , MAX(RaceYear) AS EndYear
-             FROM PeriodGroup
-             GROUP BY DriverId, PeriodNr),
-     ReturningDriver
-         AS (SELECT DriverId
-             FROM PeriodBound
-             GROUP BY DriverId
-             HAVING COUNT(*) > 1),
-     FormattedPeriod
-         AS (SELECT PeriodBound.DriverId
-                  , IIF(StartYear = EndYear, CAST(StartYear AS NVARCHAR(4)),
-                        CAST(StartYear AS NVARCHAR(4)) + N'–' + CAST(EndYear AS NVARCHAR(4))) AS Period
-             FROM PeriodBound
-                      INNER JOIN ReturningDriver ON ReturningDriver.DriverId = PeriodBound.DriverId
-             ORDER BY EndYear
+             ORDER BY DriverId, RaceYear
              OFFSET 0 ROWS),
-     MergedFormattedPeriod
-         AS (SELECT STRING_AGG(FormattedPeriod.Period, ', ') AS Period, FormattedPeriod.DriverId AS DriverId
-             FROM FormattedPeriod
-             GROUP BY FormattedPeriod.DriverId)
+     -- Determine the groups of years.
+     [Group]
+         AS (SELECT DriverYear.DriverId AS DriverId
+                  , DriverYear.RaceYear AS RaceYear
+                  , (IIF(
+                 LAG(DriverYear.RaceYear) OVER (PARTITION BY DriverYear.DriverId ORDER BY DriverYear.RaceYear) + 1 =
+                 DriverYear.RaceYear, 0,
+                 1))                    AS NewGroup
+             FROM DriverYear),
+     -- Determine the islands based on te groups.
+     Island
+         AS (SELECT [Group].RaceYear                                                                AS RaceYear
+                  , [Group].DriverId                                                                AS DriverId
+                  , SUM([Group].NewGroup)
+                        OVER (ORDER BY [Group].DriverId, [Group].RaceYear ROWS UNBOUNDED PRECEDING) AS Grp
+             FROM [Group]),
+     -- Determine the ranges based on the islands.
+     Range
+         AS (SELECT Island.DriverId                                                 AS DriverId
+                  , IIF(MIN(Island.RaceYear) = MAX(Island.RaceYear), CAST(MIN(Island.RaceYear) AS VARCHAR),
+                        CONCAT_WS('-', MIN(Island.RaceYear), MAX(Island.RaceYear))) AS Range
+                  , MIN(Island.RaceYear)                                            AS FromYear
+                  , MAX(Island.RaceYear)                                            AS ToYear
+             FROM Island
+             GROUP BY Island.DriverId, Island.Grp
+             ORDER BY DriverId, ToYear
+             OFFSET 0 ROWS),
+     -- Merge the ranges.
+     MergedRange
+         AS (SELECT Range.DriverId                AS DriverId
+                  , STRING_AGG(Range.Range, ', ') AS Ranges
+             FROM Range
+             GROUP BY Range.DriverId)
 SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                                  AS Driver
-     , MergedFormattedPeriod.Period                                                       AS Seasons
+     , MergedRange.Ranges                                                                 AS Seasons
      , DriverEntry.Entries                                                                AS Entries
      , DriverWin.Wins                                                                     AS Wins
      , CONCAT(ROUND((CAST(DriverWin.Wins AS FLOAT) / DriverEntry.Entries) * 100, 2), '%') AS Percentage
 FROM Driver
          INNER JOIN DriverEntry ON DriverEntry.DriverId = Driver.DriverId
          INNER JOIN DriverWin ON DriverWin.DriverId = Driver.DriverId
-         LEFT JOIN MergedFormattedPeriod ON MergedFormattedPeriod.DriverId = Driver.DriverId
+         LEFT JOIN MergedRange ON MergedRange.DriverId = Driver.DriverId
 WHERE DriverWin.Wins >= 25
 ORDER BY DriverWin.Wins DESC;
 
 -- Option 2
-SELECT DISTINCT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                                    AS Driver
-              , InnerResult.Entries                                                                  AS Entries
-              , InnerResult.Wins                                                                     AS Wins
-              , CONCAT(ROUND((CAST(InnerResult.Wins AS FLOAT) / InnerResult.Entries) * 100, 2), '%') AS Percentage
-FROM Result
-         CROSS APPLY (SELECT COUNT(*) OVER (PARTITION BY InnerResult.DriverId) AS Entries
-                           , COUNT(CASE WHEN InnerResult.Position = 1 THEN 1 END)
-                                   OVER (PARTITION BY InnerResult.DriverId)    AS Wins
-                      FROM Result AS InnerResult
-                      WHERE InnerResult.DriverId = Result.DriverId) AS InnerResult
-         INNER JOIN Driver ON Driver.DriverId = Result.DriverId
-WHERE InnerResult.Wins >= 25
+
+WITH -- Select all the years the drivers took part in.
+     DriverYear
+         AS (SELECT DISTINCT Result.DriverId AS DriverId
+                           , Race.RaceYear   AS RaceYear
+             FROM Result
+                      INNER JOIN Race ON Race.RaceId = Result.RaceId
+             ORDER BY DriverId, RaceYear
+             OFFSET 0 ROWS),
+     -- Determine the groups of years.
+     [Group]
+         AS (SELECT DriverYear.DriverId AS DriverId
+                  , DriverYear.RaceYear AS RaceYear
+                  , (IIF(
+                 LAG(DriverYear.RaceYear) OVER (PARTITION BY DriverYear.DriverId ORDER BY DriverYear.RaceYear) + 1 =
+                 DriverYear.RaceYear, 0,
+                 1))                    AS NewGroup
+             FROM DriverYear),
+     -- Determine the islands based on te groups.
+     Island
+         AS (SELECT [Group].RaceYear                                                                AS RaceYear
+                  , [Group].DriverId                                                                AS DriverId
+                  , SUM([Group].NewGroup)
+                        OVER (ORDER BY [Group].DriverId, [Group].RaceYear ROWS UNBOUNDED PRECEDING) AS Grp
+             FROM [Group]),
+     -- Determine the ranges based on the islands.
+     Range
+         AS (SELECT Island.DriverId                                                 AS DriverId
+                  , IIF(MIN(Island.RaceYear) = MAX(Island.RaceYear), CAST(MIN(Island.RaceYear) AS VARCHAR),
+                        CONCAT_WS('-', MIN(Island.RaceYear), MAX(Island.RaceYear))) AS Range
+                  , MIN(Island.RaceYear)                                            AS FromYear
+                  , MAX(Island.RaceYear)                                            AS ToYear
+             FROM Island
+             GROUP BY Island.DriverId, Island.Grp
+             ORDER BY DriverId, ToYear
+             OFFSET 0 ROWS),
+     -- Merge the ranges.
+     MergedRange
+         AS (SELECT Range.DriverId                AS DriverId
+                  , STRING_AGG(Range.Range, ', ') AS Ranges
+             FROM Range
+             GROUP BY Range.DriverId)
+SELECT DISTINCT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                          AS Driver
+              , MergedRange.Ranges                                                         AS Seasons
+              , Result.Entries                                                             AS Entries
+              , Result.Wins                                                                AS Wins
+              , CONCAT(ROUND((CAST(Result.Wins AS FLOAT) / Result.Entries) * 100, 2), '%') AS Percentage
+FROM Driver
+         -- Calculate the number of entries and wins for each driver.
+         CROSS APPLY (SELECT COUNT(*) OVER (PARTITION BY Result.DriverId) AS Entries
+                           , COUNT(CASE WHEN Result.Position = 1 THEN 1 END)
+                                   OVER (PARTITION BY Result.DriverId)    AS Wins
+                      FROM Result
+                      WHERE Result.DriverId = Driver.DriverId) AS Result
+-- Join the merged ranges.
+         INNER JOIN MergedRange ON MergedRange.DriverId = Driver.DriverId
+WHERE Result.Wins >= 25;
