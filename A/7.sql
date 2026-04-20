@@ -1,7 +1,4 @@
--- Ik ben mij ervan bewust dat SQL server een import functie heeft voor CSV. Maar ik krijg het niet voor elkaar om
---  mijn CSV in de docker container te krijgen, iedere keer rechten-errors wegens een of andere rare permissie
---  structuur die Microsoft in de container gedaan heeft, daarom deze handmatige aanpak.
-
+-- Create helper function for splitting strings.
 CREATE OR ALTER FUNCTION dbo.SplitPart(@s NVARCHAR(MAX), @sep NCHAR(1), @n INT)
     RETURNS NVARCHAR(MAX) AS
 BEGIN
@@ -12,9 +9,11 @@ BEGIN
 END;
 GO
 
+-- Drop the existing race results table if it exists.
 DROP TABLE IF EXISTS #RaceResults;
 GO
 
+-- Create the race results.
 CREATE TABLE #RaceResults
 (
     RaceNr      INT,
@@ -29,7 +28,8 @@ CREATE TABLE #RaceResults
 );
 GO
 
-DECLARE @csv NVARCHAR(MAX) = N'202114;Monza;1;77;Valtteri Bottas;MERCEDES;18;27:54.078;3
+-- Create the CSV string.
+DECLARE @csv NVARCHAR = N'202114;Monza;1;77;Valtteri Bottas;MERCEDES;18;27:54.078;3
 202114;Monza;2;33;Max Verstappen;RED BULL RACING HONDA;18;+2.325s;2
 202114;Monza;3;3;Daniel Ricciardo;MCLAREN MERCEDES;18;+14.534s;1
 202110;Silverstone;1;33;Max Verstappen;RED BULL RACING HONDA;17;25:38.426;3
@@ -39,6 +39,7 @@ DECLARE @csv NVARCHAR(MAX) = N'202114;Monza;1;77;Valtteri Bottas;MERCEDES;18;27:
 202119;Sao Paulo;2;33;Max Verstappen;RED BULL RACING HONDA;24;+1.170s;2
 202119;Sao Paulo;3;55;Carlos Sainz;FERRARI;24;+18.723s;1';
 
+-- Parse the CSV string into the temporary table.
 INSERT INTO #RaceResults
 SELECT TRY_CAST(dbo.SplitPart(value, ';', 1) AS INT), -- RaceNr
        dbo.SplitPart(value, ';', 2),                  -- Circuit
@@ -50,7 +51,4 @@ SELECT TRY_CAST(dbo.SplitPart(value, ';', 1) AS INT), -- RaceNr
        dbo.SplitPart(value, ';', 8),                  -- Time/Retired
        TRY_CAST(dbo.SplitPart(value, ';', 9) AS INT)  -- Points
 FROM STRING_SPLIT(@csv, CHAR(10))
-WHERE LTRIM(RTRIM(value)) <> '';
-
-SELECT *
-FROM #RaceResults;
+WHERE TRIM(value) <> '';
