@@ -33,7 +33,7 @@ GO
 -- Test01 (Should succeed) - Insert two results for the same race with different positions, after year 1962.
 ------------------------------------------------------------------------------------------------------------------------
 
--- Begin the transaction of the first test.
+-- Begin the transaction of the test.
 BEGIN TRANSACTION
 PRINT 'Test01: performing'
 
@@ -76,7 +76,7 @@ GO
 -- Test02 (Should succeed) - Insert two results for the same race with same position, before year 1962.
 ------------------------------------------------------------------------------------------------------------------------
 
--- Begin the transaction of the second test.
+-- Begin the transaction of the test.
 BEGIN TRANSACTION
 PRINT 'Test02: performing'
 
@@ -120,7 +120,7 @@ GO
 -- Test03 (Should fail) - Insert two results for the same race with same position, after year 1962.
 ------------------------------------------------------------------------------------------------------------------------
 
--- Begin the transaction of the second test.
+-- Begin the transaction of the test.
 BEGIN TRANSACTION
 PRINT 'Test03: performing'
 
@@ -162,6 +162,94 @@ END TRY
 BEGIN CATCH
     PRINT 'Test03: expected exception occurred'
     PRINT 'Test03: succeeded (conflict was expected)'
+END CATCH
+
+-- Always rollback test data
+ROLLBACK
+GO
+
+------------------------------------------------------------------------------------------------------------------------
+-- Test04 (Should succeed) - Insert two results at once for the same race with same position, before year 1962.
+------------------------------------------------------------------------------------------------------------------------
+
+-- Begin the transaction of the test.
+BEGIN TRANSACTION
+PRINT 'Test04: performing'
+
+-- Create the test circuit.
+PRINT 'Test04: creating test circuit'
+INSERT INTO Circuit(CircuitId)
+VALUES (900000)
+
+-- Create the test drivers.
+PRINT 'Test04: creating test driver'
+INSERT INTO Driver(DriverId)
+VALUES (900000),
+       (900001)
+
+-- Create the test season.
+PRINT 'Test04: creating test season'
+INSERT INTO Season(RaceYear, SeasonUrl)
+VALUES (1600, 'https://example.com')
+
+-- Create the test race.
+PRINT 'Test04: creating test race'
+INSERT INTO Race(RaceId, RaceYear, NrOfRound, CircuitId, RaceName, RaceDate)
+VALUES (900000, 1600, 1, 900000, 'Test race', '02-03-1600')
+
+-- Create the results.
+PRINT 'Test04: inserting results'
+INSERT INTO Result(ResultId, RaceId, DriverId, Position)
+VALUES (900000, 900000, 900000, 1),
+       (900001, 900000, 900001, 1)
+
+-- The test was successful, perform rollback to prevent persisting test data.
+PRINT 'Test04: succeeded'
+ROLLBACK
+GO
+
+------------------------------------------------------------------------------------------------------------------------
+-- Test05 (Should fail) - Insert two results at once for the same race with same position, after year 1962.
+------------------------------------------------------------------------------------------------------------------------
+
+-- Begin the transaction of the test.
+BEGIN TRANSACTION
+PRINT 'Test05: performing'
+
+BEGIN TRY
+    -- Create the test circuit.
+    PRINT 'Test05: creating test circuit'
+    INSERT INTO Circuit(CircuitId)
+    VALUES (900000)
+
+    -- Create the test drivers.
+    PRINT 'Test05: creating test driver'
+    INSERT INTO Driver(DriverId)
+    VALUES (900000),
+           (900001)
+
+    -- Create the test season.
+    PRINT 'Test05: creating test season'
+    INSERT INTO Season(RaceYear, SeasonUrl)
+    VALUES (2030, 'https://example.com')
+
+    -- Create the test race.
+    PRINT 'Test05: creating test race'
+    INSERT INTO Race(RaceId, RaceYear, NrOfRound, CircuitId, RaceName, RaceDate)
+    VALUES (900000, 2030, 1, 900000, 'Test race', '2030-03-02')
+
+    -- Inserting the results
+    PRINT 'Test05: inserting the results'
+    INSERT INTO Result(ResultId, RaceId, DriverId, Position)
+    VALUES (900000, 900000, 900000, 1),
+           (900001, 900000, 900001, 1);
+
+    -- If we reach here, the test failed (no exception thrown)
+    THROW 50001, 'Test failed: expected exception was not thrown', 1
+END TRY
+BEGIN CATCH
+    PRINT 'Test05: expected exception occurred'
+    PRINT 'Test05: succeeded (conflict was expected)'
 END CATCH
 
 -- Always rollback test data
