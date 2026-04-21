@@ -186,7 +186,7 @@ BEGIN TRY
          @Position = 1;
 
     -- If we reach here, the test failed (no exception thrown)
-    THROW 5001, 'Test failed: expected exception was not thrown', 1
+    THROW 50001, 'Test failed: expected exception was not thrown', 1
 END TRY
 BEGIN CATCH
     PRINT 'Test03: expected exception occurred'
