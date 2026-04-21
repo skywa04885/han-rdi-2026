@@ -9,6 +9,7 @@
     <file url="file://$PROJECT_DIR$/A/6.sql" dialect="TSQL" />
     <file url="file://$PROJECT_DIR$/A/7.sql" dialect="TSQL" />
     <file url="file://$PROJECT_DIR$/A/range-view.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/B/1-after-trigger.sql" dialect="TSQL" />
     <file url="file://$PROJECT_DIR$/B/1-stored-procedure.sql" dialect="TSQL" />
   </component>
 </project>
