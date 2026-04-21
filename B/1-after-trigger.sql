@@ -255,3 +255,103 @@ END CATCH
 -- Always rollback test data
 ROLLBACK
 GO
+
+------------------------------------------------------------------------------------------------------------------------
+-- Test06 (Should succeed) - Update a result to a new unique position (no conflict), after year 1962.
+------------------------------------------------------------------------------------------------------------------------
+
+-- Begin the transaction of the test.
+BEGIN TRANSACTION
+PRINT 'Test06: performing'
+
+-- Create the test circuit.
+PRINT 'Test06: creating test circuit'
+INSERT INTO Circuit(CircuitId)
+VALUES (900000)
+
+-- Create the test drivers.
+PRINT 'Test06: creating test driver'
+INSERT INTO Driver(DriverId)
+VALUES (900000),
+       (900001)
+
+-- Create the test season.
+PRINT 'Test06: creating test season'
+INSERT INTO Season(RaceYear, SeasonUrl)
+VALUES (2030, 'https://example.com')
+
+-- Create the test race.
+PRINT 'Test06: creating test race'
+INSERT INTO Race(RaceId, RaceYear, NrOfRound, CircuitId, RaceName, RaceDate)
+VALUES (900000, 2030, 1, 900000, 'Test race', '2030-03-02')
+
+-- Insert initial results.
+PRINT 'Test06: inserting initial results'
+INSERT INTO Result(ResultId, RaceId, DriverId, Position)
+VALUES (900000, 900000, 900000, 1),
+       (900001, 900000, 900001, 2);
+
+-- Update second result to a new non-conflicting position.
+PRINT 'Test06: updating position (no conflict expected)'
+UPDATE Result
+SET Position = 3
+WHERE ResultId = 900001;
+
+-- The test was successful, perform rollback to prevent persisting test data.
+PRINT 'Test06: succeeded'
+ROLLBACK
+GO
+
+------------------------------------------------------------------------------------------------------------------------
+-- Test07 (Should fail) - Update a result to a duplicate position (conflict introduced), after year 1962.
+------------------------------------------------------------------------------------------------------------------------
+
+-- Begin the transaction of the test.
+BEGIN TRANSACTION
+PRINT 'Test07: performing'
+
+BEGIN TRY
+    -- Create the test circuit.
+    PRINT 'Test07: creating test circuit'
+    INSERT INTO Circuit(CircuitId)
+    VALUES (900000)
+
+    -- Create the test drivers.
+    PRINT 'Test07: creating test driver'
+    INSERT INTO Driver(DriverId)
+    VALUES (900000),
+           (900001)
+
+    -- Create the test season.
+    PRINT 'Test07: creating test season'
+    INSERT INTO Season(RaceYear, SeasonUrl)
+    VALUES (2030, 'https://example.com')
+
+    -- Create the test race.
+    PRINT 'Test07: creating test race'
+    INSERT INTO Race(RaceId, RaceYear, NrOfRound, CircuitId, RaceName, RaceDate)
+    VALUES (900000, 2030, 1, 900000, 'Test race', '2030-03-02')
+
+    -- Insert initial results.
+    PRINT 'Test07: inserting initial results'
+    INSERT INTO Result(ResultId, RaceId, DriverId, Position)
+    VALUES (900000, 900000, 900000, 1),
+           (900001, 900000, 900001, 2);
+
+    -- Update second result to conflicting position.
+    PRINT 'Test07: updating position to duplicate (should fail)'
+    UPDATE Result
+    SET Position = 1
+    WHERE ResultId = 900001;
+
+    -- If we reach here, the test failed (no exception thrown)
+    THROW 50001, 'Test failed: expected exception was not thrown', 1
+END TRY
+BEGIN CATCH
+    PRINT 'Test07: expected exception occurred'
+    PRINT 'Test07: succeeded (conflict was expected)'
+END CATCH
+
+-- Always rollback test data
+ROLLBACK
+GO
