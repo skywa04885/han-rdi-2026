@@ -7,3 +7,7 @@ services:
       MSSQL_PID: Evaluation
     ports:
       - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+volumes:
+  mssql_data:
