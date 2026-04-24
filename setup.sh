@@ -1,1 +1,1 @@
-docker compose exec -T mssql /opt/mssql-tools18/bin/sqlcmd -C   -S localhost -U sa -P 'SomeGoodPassword!' -d master    -i /dev/stdin < ./Database_RDI2026_Script_v2019.sql
+docker compose exec -T mssql /opt/mssql-tools18/bin/sqlcmd -C   -S localhost -U sa -P 'SomeGoodPassword!' -d master    -i /dev/stdin < ./setup.sql
