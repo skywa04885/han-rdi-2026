@@ -45,9 +45,7 @@ WITH SeasonWinner
                       INNER JOIN SeasonWinner
                                  ON SeasonWinner.DriverId = Result.DriverId AND
                                     SeasonWinner.RaceYear = Race.RaceYear
-                      INNER JOIN ResultStatus ON ResultStatus.ResultStatusId = Result.ResultStatusId
              WHERE Result.Position = 1
-               AND ResultStatus.ResultStatus != 'Disqualified'
              GROUP BY Race.RaceYear)
 
 SELECT SeasonWinner.RaceYear    AS Seizoen
@@ -94,11 +92,9 @@ FROM SeasonWinner
          CROSS APPLY (SELECT COUNT(*) AS RaceWins
                       FROM Result
                                INNER JOIN Race ON Race.RaceId = Result.RaceId
-                               INNER JOIN ResultStatus ON ResultStatus.ResultStatusId = Result.ResultStatusId
                       WHERE Result.DriverId = SeasonWinner.DriverId
                         AND Race.RaceYear = SeasonWinner.RaceYear
-                        AND Result.Position = 1
-                        AND ResultStatus.ResultStatus != 'Disqualified') AS RaceWins
+                        AND Result.Position = 1) AS RaceWins
          CROSS APPLY (SELECT TOP 1 Race.RaceDate
                                  , Race.NrOfRound
                                  , Race.RaceName

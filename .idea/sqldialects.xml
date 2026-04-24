@@ -19,5 +19,6 @@
     <file url="file://$PROJECT_DIR$/B/4-stored-procedure.sql" dialect="TSQL" />
     <file url="file://$PROJECT_DIR$/B/5-after-trigger.sql" dialect="TSQL" />
     <file url="file://$PROJECT_DIR$/B/5-stored-procedure.sql" dialect="TSQL" />
+    <file url="file://$PROJECT_DIR$/D/indexen.sql" dialect="TSQL" />
   </component>
 </project>
