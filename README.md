@@ -1,10 +1,10 @@
-# A. Bevragingen
+# Bevragingen
 
-## A.1. Welke coureurs zijn in alle races van het seizoen 2024 ge-finished?
+## Welke coureurs zijn in alle races van het seizoen 2024 ge-finished?
 
-### A.1.1. Primaire Uitwerking
+### Primaire Uitwerking
 
-#### A.1.1.1. Query
+#### Query
 
 ```sql
 WITH
@@ -43,7 +43,7 @@ WHERE MinCompletion.MinCompletion >= 0.9
 ORDER BY MinCompletion.MinCompletion DESC;
 ```
 
-#### A.1.1.2. Resultaten
+#### Resultaten
 
 | Name           | Completion |
 |----------------|------------|
@@ -53,7 +53,7 @@ ORDER BY MinCompletion.MinCompletion DESC;
 | Liam Lawson    | 95%        |
 | Lando Norris   | 90%        |
 
-#### A.1.1.3. Toelichting
+#### Toelichting
 
 Deze query bepaalt per race in het seizoen 2024 hoeveel ronden er maximaal zijn gereden. 
 Dit maximum wordt gebruikt als benadering voor het totaal aantal ronden van die race. 
@@ -70,11 +70,11 @@ Daarmee blijven alleen coureurs over die in elke gereden race van 2024 ten minst
 de raceafstand hebben afgelegd. De namen worden opgehaald uit de tabel Driver, en het 
 percentage wordt afgerond en weergegeven als tekstwaarde.
 
-#### A.1.1.4. Query plan
+#### Query plan
 
 ![Queryplan primaire implementatie](./assets/1-primary-query-plan.png)
 
-#### A.1.1.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_RaceId_index
@@ -86,9 +86,9 @@ create index Result_RaceId_index
 go
 ```
 
-### A.1.2. Alternatieve Uitwerking
+### Alternatieve Uitwerking
 
-#### A.1.2.1. Query
+#### Query
 
 ```sql
 WITH
@@ -115,7 +115,7 @@ WHERE DriverCompletion.MinCompletion >= 0.9
 ORDER BY DriverCompletion.MinCompletion DESC;
 ```
 
-#### A.1.2.2. Resultaten
+#### Resultaten
 
 | Name           | Completion |
 |----------------|------------|
@@ -125,7 +125,7 @@ ORDER BY DriverCompletion.MinCompletion DESC;
 | Liam Lawson    | 95%        |
 | Lando Norris   | 90%        |
 
-#### A.1.2.3. Toelichting
+#### Toelichting
 
 Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van eerst in een aparte 
 CTE het maximale aantal ronden per race te bepalen, gebruikt deze query een window function: 
@@ -140,11 +140,11 @@ Tot slot filtert de query op coureurs met een minimale voltooiing van 90% of hog
 eindresultaat is daardoor gelijk aan de primaire uitwerking, maar de query is korter doordat de 
 raceafstand via een window function binnen dezelfde tussenstap wordt berekend.
 
-#### A.1.2.4. Query plan
+#### Query plan
 
 ![Queryplan alternatieve implementatie](./assets/1-alternative-query-plan.png)
 
-#### A.1.2.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_RaceId_index
@@ -152,11 +152,11 @@ create index Result_RaceId_index
 go
 ```
 
-## A.2. Van 2004 tot en met 2024: per race de snelste ronde met circuit, racedatum, coureur, rondenummer, rondetijd, positie, punten, totaal aantal rondes en resultstatus; gesorteerd op circuit en daarna op rondetijd.
+## Van 2004 tot en met 2024: per race de snelste ronde met circuit, racedatum, coureur, rondenummer, rondetijd, positie, punten, totaal aantal rondes en resultstatus; gesorteerd op circuit en daarna op rondetijd.
 
-### A.2.1. Primaire Uitwerking
+### Primaire Uitwerking
 
-#### A.2.1.1. Query
+#### Query
 
 ```sql
 WITH FastestRaceResult
@@ -187,7 +187,7 @@ ON Race.RaceId = FastestRaceResult.RaceId
 ORDER BY CircuitName, FastestLapTime;
 ```
 
-#### A.2.1.2. Resultaten
+#### Resultaten
 
 | CircuitName                    | RaceDate   | Name               | FastestLap | FastestLapTime   | Position | Points  | Laps | ResultStatus |
 |--------------------------------|------------|--------------------|------------|------------------|----------|---------|------|--------------|
@@ -209,7 +209,7 @@ ORDER BY CircuitName, FastestLapTime;
 | Albert Park Grand Prix Circuit | 2012-03-18 | Jenson Button      | 56         | 00:01:29.1870000 | 1        | 25.0000 | 58   | Finished     |
 | ...                            | ...        | ...                | ...        | ...              | ...      | ...     | ...  | ...          | 
 
-#### A.2.1.3. Toelichting
+#### Toelichting
 
 Deze query zoekt per race tussen 2004 en 2024 de snelste rondetijd. In de CTE FastestRaceResult wordt voor elke race 
 met een subquery het ResultId opgehaald van het resultaat met de laagste FastestLapTime. Resultaten zonder snelste 
@@ -222,17 +222,17 @@ rondenummer, de eindpositie, punten, het totaal aantal gereden rondes en de resu
 Tot slot wordt het resultaat gesorteerd op circuitnaam en daarna op rondetijd. Daardoor staan de snelste rondes per 
 circuit gegroepeerd, met binnen elk circuit de snelste tijden bovenaan.
 
-#### A.2.1.4. Query plan
+#### Query plan
 
 ![Queryplan primaire implementatie](./assets/2-primary-query-plan.png)
 
-#### A.2.1.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 Er zijn geen indexen voorgesteld door de database management tool voor deze query.
 
-### A.2.2. Alternatieve Uitwerking
+### Alternatieve Uitwerking
 
-#### A.2.2.1. Query
+#### Query
 
 ```sql
 WITH RankedResults
@@ -274,7 +274,7 @@ WHERE rr.rn = 1
 ORDER BY CircuitName, FastestLapTime;
 ```
 
-#### A.2.2.2. Resultaten
+#### Resultaten
 
 | CircuitName                    | RaceDate   | Name               | FastestLap | FastestLapTime   | Position | Points  | Laps | ResultStatus |
 |--------------------------------|------------|--------------------|------------|------------------|----------|---------|------|--------------|
@@ -296,7 +296,7 @@ ORDER BY CircuitName, FastestLapTime;
 | Albert Park Grand Prix Circuit | 2012-03-18 | Jenson Button      | 56         | 00:01:29.1870000 | 1        | 25.0000 | 58   | Finished     |
 | ...                            | ...        | ...                | ...        | ...              | ...      | ...     | ...  | ...          | 
 
-#### A.2.2.3. Toelichting
+#### Toelichting
 
 Deze alternatieve query gebruikt een window function om per race de snelste ronde te bepalen. In de CTE RankedResults 
 krijgen alle resultaten met een ingevulde FastestLapTime een rangnummer per race via `ROW_NUMBER() OVER (PARTITION 
@@ -309,11 +309,11 @@ Deze aanpak levert hetzelfde resultaat op als de primaire uitwerking, maar is va
 selectie van de snelste ronde expliciet via rangschikking gebeurt. Ook sluit deze vorm goed aan op de aanbevolen 
 indexen, omdat er per race wordt geordend op FastestLapTime.
 
-#### A.2.2.4. Query plan
+#### Query plan
 
 ![Queryplan alternatieve implementatie](./assets/2-alternative-query-plan.png)
 
-#### A.2.2.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_FastestLapTime_index
@@ -325,11 +325,11 @@ create index Result_RaceId_FastestLapTime_index
 go
 ```
 
-## A.3. Toon voor de seizoenen 2015 tot en met 2024 de winnaar van het seizoen. Geef het jaartal van het seizoen, de naam van de winnaar, het aantal races dat hij heeft gewonnen. Voeg ook het totaal aantal races toe, en voeg tot slot het volgende toe: vanaf welke race (datum, volgnummer in het seizoen + naam van de race) stond hij in de klassering op de eerste plaats en behield hij die eerste plek tot het einde toe.
+## Toon voor de seizoenen 2015 tot en met 2024 de winnaar van het seizoen. Geef het jaartal van het seizoen, de naam van de winnaar, het aantal races dat hij heeft gewonnen. Voeg ook het totaal aantal races toe, en voeg tot slot het volgende toe: vanaf welke race (datum, volgnummer in het seizoen + naam van de race) stond hij in de klassering op de eerste plaats en behield hij die eerste plek tot het einde toe.
 
-### A.3.1. Primaire Uitwerking
+### Primaire Uitwerking
 
-#### A.3.1.1. Query
+#### Query
 
 ```sql
 WITH SeasonWinner
@@ -397,7 +397,7 @@ FROM SeasonWinner
 ORDER BY SeasonWinner.RaceYear;
 ```
 
-#### A.3.1.2. Resultaten
+#### Resultaten
 
 | Seizoen | Kampioen       | RaceWins | TotaalRaces | LeiderVanaf | Volgnummer | Race                  |
 |---------|----------------|----------|-------------|-------------|------------|-----------------------|
@@ -412,7 +412,7 @@ ORDER BY SeasonWinner.RaceYear;
 | 2023    | Max Verstappen | 19       | 22          | 2023-03-05  | 1          | Bahrain Grand Prix    |
 | 2024    | Max Verstappen | 9        | 24          | 2024-03-02  | 1          | Bahrain Grand Prix    |
 
-#### A.3.1.3. Toelichting
+#### Toelichting
 
 Deze query bepaalt per seizoen tussen 2015 en 2024 wie aan het einde van het seizoen bovenaan stond in de 
 coureursstand. Dit gebeurt in SeasonWinner, waar per seizoen wordt gekeken naar de laatste race van dat jaar en de 
@@ -426,17 +426,17 @@ Daarnaast berekent de query het totaal aantal races in het seizoen en het aantal
 heeft gewonnen. In het eindresultaat worden deze gegevens gecombineerd met de datum, het volgnummer en de naam van de 
 race vanaf waar de kampioen de leiding definitief behield.
 
-#### A.3.1.4. Query plan
+#### Query plan
 
 ![Queryplan primaire implementatie](./assets/3-primary-query-plan.png)
 
-#### A.3.1.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 Er zijn geen indexen voorgesteld door de database management tool voor deze query.
 
-### A.3.2. Alternatieve Uitwerking
+### Alternatieve Uitwerking
 
-#### A.3.2.1. Query
+#### Query
 
 ```sql
 WITH SeasonWinner
@@ -489,7 +489,7 @@ FROM SeasonWinner
 ORDER BY SeasonWinner.RaceYear;
 ```
 
-#### A.3.2.2. Resultaten
+#### Resultaten
 
 | Seizoen | Kampioen       | RaceWins | TotaalRaces | LeiderVanaf | Volgnummer | Race                  |
 |---------|----------------|----------|-------------|-------------|------------|-----------------------|
@@ -504,7 +504,7 @@ ORDER BY SeasonWinner.RaceYear;
 | 2023    | Max Verstappen | 19       | 22          | 2023-03-05  | 1          | Bahrain Grand Prix    |
 | 2024    | Max Verstappen | 9        | 24          | 2024-03-02  | 1          | Bahrain Grand Prix    |
 
-#### A.3.2.3. Toelichting
+#### Toelichting
 
 Deze alternatieve query bepaalt eerst op dezelfde manier de seizoenswinnaar: de coureur die na de laatste race van elk 
 seizoen tussen 2015 en 2024 bovenaan stond in de coureursstand.
@@ -518,19 +518,19 @@ De `NOT EXISTS`-voorwaarde controleert dus of de gekozen race echt het beginpunt
 leiding. Het resultaat toont per seizoen de kampioen, zijn aantal overwinningen, het totaal aantal races en de race 
 vanaf waar hij de eerste plaats tot het einde vasthield.
 
-#### A.3.2.4. Query plan
+#### Query plan
 
 ![Queryplan alternatieve implementatie](./assets/3-alternative-query-plan.png)
 
-#### A.3.2.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 Er zijn geen indexen voorgesteld door de database management tool voor deze query.
 
-## A.4. Welke coureurs hebben na deelname van een of meerdere seizoenen een periode niet deelgenomen en zijn in een later seizoen weer teruggekeerd in de Formule 1? Geef de naam van de coureur in alfabetische volgorde en daarnaast de periodes (in het format “1991–2006”, “2010–2012”) waarin ze deelgenomen hebben. Zet deze periodes op chronologische volgorde.
+## Welke coureurs hebben na deelname van een of meerdere seizoenen een periode niet deelgenomen en zijn in een later seizoen weer teruggekeerd in de Formule 1? Geef de naam van de coureur in alfabetische volgorde en daarnaast de periodes (in het format “1991–2006”, “2010–2012”) waarin ze deelgenomen hebben. Zet deze periodes op chronologische volgorde.
 
-### A.4.1. Primaire Uitwerking
+### Primaire Uitwerking
 
-#### A.4.1.1. Query
+#### Query
 
 ```sql
 SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname) AS Coureur
@@ -588,7 +588,7 @@ FROM DriverYearRange
 GROUP BY DriverYearRange.DriverId;
 ```
 
-#### A.4.1.2. Resultaten
+#### Resultaten
 
 | Coureur         | Periodes                   |
 |-----------------|----------------------------|
@@ -610,7 +610,7 @@ GROUP BY DriverYearRange.DriverId;
 | Albert Scherrer | 1953                       |
 | ...             | ...                        |
 
-#### A.4.1.3. Toelichting
+#### Toelichting
 
 Deze query gebruikt de view DriverYearRanges om per coureur te tonen in welke seizoenen hij heeft deelgenomen aan 
 Formule 1-races. De hoofdquery zelf blijft daardoor eenvoudig: de coureurs worden gekoppeld aan de view en 
@@ -628,11 +628,11 @@ Tot slot worden alle periodes van dezelfde coureur samengevoegd met STRING_AGG. 
 overzicht met alle deelnameperiodes in chronologische volgorde. De view is apart aangemaakt omdat dezelfde 
 periode-indeling ook in latere queries opnieuw gebruikt kan worden.
 
-#### A.4.1.4. Query plan
+#### Query plan
 
 ![Queryplan primaire implementatie](./assets/4-primary-query-plan.png)
 
-#### A.4.1.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_RaceId_index
@@ -640,11 +640,11 @@ create index Result_RaceId_index
 go
 ```
 
-## A.5. Maak een overzicht van alle F1 coureurs die in hun volledige carrière 25 of meer wedstrijden hebben gewonnen. Toon per coureur zijn naam, in één veld een overzicht van de seizoenen waarin hij gereden heeft (ontbrekende jaren weglaten), het aantal races dat hij gestart is, het aantal races die hij gewonnen heeft en het percentage van het aantal races die hij gewonnen heeft ten opzichte van het aantal races dat hij gestart is. Een voorbeeld van hoe het er voor Michael Schumacher en Ayrton Senna uitziet, zie je hieronder.
+## Maak een overzicht van alle F1 coureurs die in hun volledige carrière 25 of meer wedstrijden hebben gewonnen. Toon per coureur zijn naam, in één veld een overzicht van de seizoenen waarin hij gereden heeft (ontbrekende jaren weglaten), het aantal races dat hij gestart is, het aantal races die hij gewonnen heeft en het percentage van het aantal races die hij gewonnen heeft ten opzichte van het aantal races dat hij gestart is. Een voorbeeld van hoe het er voor Michael Schumacher en Ayrton Senna uitziet, zie je hieronder.
 
-### A.5.1. Primaire Uitwerking
+### Primaire Uitwerking
 
-#### A.5.1.1. Query
+#### Query
 
 ```sql
 WITH DriverEntry
@@ -673,7 +673,7 @@ WHERE DriverWin.Wins >= 25
 ORDER BY DriverWin.Wins DESC;
 ```
 
-#### A.5.1.2. Resultaten
+#### Resultaten
 
 | Driver             | Seasons                    | Entries | Wins | Percentage |
 |--------------------|----------------------------|---------|------|------------|
@@ -689,7 +689,7 @@ ORDER BY DriverWin.Wins DESC;
 | Niki Lauda         | 1971-1979, 1982-1985       | 174     | 25   | 14.37%     |
 | Jim Clark          | 1960-1968                  | 73      | 25   | 34.25%     |
 
-#### A.5.1.3. Toelichting
+#### Toelichting
 
 Deze query maakt een overzicht van coureurs die in hun volledige carrière minimaal 25 races hebben gewonnen. 
 Eerst wordt in DriverEntry per coureur geteld aan hoeveel races hij heeft deelgenomen. Daarna wordt in DriverWin 
@@ -703,11 +703,11 @@ Vervolgens worden alleen coureurs geselecteerd met minimaal 25 overwinningen. He
 door het aantal overwinningen te delen door het aantal deelnames en dit om te zetten naar een percentage. Tot 
 slot wordt gesorteerd op het aantal overwinningen, zodat de meest succesvolle coureurs bovenaan staan.
 
-#### A.5.1.4. Query plan
+#### Query plan
 
 ![Queryplan primaire implementatie](./assets/5-primary-query-plan.png)
 
-#### A.5.1.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_RaceId_index
@@ -719,9 +719,9 @@ create index Result_DriverId_index
     go
 ```
 
-### A.5.2. Alternatieve Uitwerking
+### Alternatieve Uitwerking
 
-#### A.5.2.1. Query
+#### Query
 
 ```sql
 SELECT DISTINCT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                          AS Driver
@@ -742,7 +742,7 @@ ON DriverYearRanges.DriverId = Driver.DriverId
 WHERE Result.Wins >= 25;
 ```
 
-#### A.5.2.2. Resultaten
+#### Resultaten
 
 | Driver             | Seasons                    | Entries | Wins | Percentage |
 |--------------------|----------------------------|---------|------|------------|
@@ -758,7 +758,7 @@ WHERE Result.Wins >= 25;
 | Niki Lauda         | 1971-1979, 1982-1985       | 174     | 25   | 14.37%     |
 | Sebastian Vettel   | 2007-2022                  | 300     | 53   | 17.67%     |
 
-#### A.5.2.3. Toelichting
+#### Toelichting
 
 Deze alternatieve query berekent het aantal deelnames en overwinningen per coureur met behulp van `CROSS APPLY` en 
 window functions. Voor elke coureur wordt in de gekoppelde subquery gekeken naar alle resultaten van die coureur. 
@@ -773,19 +773,19 @@ Daarna filtert de query op coureurs met minimaal 25 overwinningen en berekent hi
 manier als de primaire uitwerking. Deze aanpak levert inhoudelijk hetzelfde resultaat op, maar gebruikt een andere 
 techniek: de tellingen worden niet vooraf in aparte CTE’s gegroepeerd, maar per coureur berekend binnen de `CROSS APPLY`.
 
-#### A.5.2.4. Query plan
+#### Query plan
 
 ![Queryplan alternatieve implementatie](./assets/5-alternative-query-plan.png)
 
-#### A.5.2.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 Er zijn geen indexen voorgesteld door de database management tool voor deze query.
 
-## A.6. Er zijn niet ieder jaar evenveel wedstrijden gereden. Daarom is het interessant om te zien welke coureur procentueel de meeste races per seizoen heeft gewonnen. Maak onderstaand overzicht
+## Er zijn niet ieder jaar evenveel wedstrijden gereden. Daarom is het interessant om te zien welke coureur procentueel de meeste races per seizoen heeft gewonnen. Maak onderstaand overzicht
 
-### A.6.1. Primaire Uitwerking
+### Primaire Uitwerking
 
-#### A.6.1.1. Query
+#### Query
 
 ```sql
 WITH DriverWins AS (SELECT Result.DriverId AS DriverId
@@ -815,7 +815,7 @@ FROM DriverRaces
 ORDER BY COALESCE(DriverWins.Wins, 0) * 1.0 / DriverRaces.Races DESC;
 ```
 
-#### A.6.1.2. Resultaten
+#### Resultaten
 
 | Driver             | Season | Races | Wins | Percentage |
 |--------------------|--------|-------|------|------------|
@@ -837,7 +837,7 @@ ORDER BY COALESCE(DriverWins.Wins, 0) * 1.0 / DriverRaces.Races DESC;
 | Jim Clark          | 1963   | 10    | 7    | 70.00%     |
 | ...                | ...    | ...   | ...  | ...        |
 
-#### A.6.1.3. Toelichting
+#### Toelichting
 
 Deze query berekent per coureur en per seizoen welk percentage van zijn gereden races hij heeft gewonnen. Eerst 
 wordt in DriverWins per coureur en seizoen geteld hoeveel races hij heeft gewonnen. Daarna wordt in DriverRaces 
@@ -851,11 +851,11 @@ Het winstpercentage wordt berekend door het aantal overwinningen te delen door h
 `NULLIF` voorkomt hierbij dat er door nul gedeeld wordt. Tot slot wordt gesorteerd op het hoogste winstpercentage, 
 waardoor coureurs met het grootste aandeel gewonnen races bovenaan komen te staan.
 
-#### A.6.1.4. Query plan
+#### Query plan
 
 ![Queryplan primaire implementatie](./assets/6-primary-query-plan.png)
 
-#### A.6.1.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_RaceId_index
@@ -863,9 +863,9 @@ create index Result_RaceId_index
 go
 ```
 
-### A.6.2. Alternatieve Uitwerking
+### Alternatieve Uitwerking
 
-#### A.6.2.1. Query
+#### Query
 
 ```sql
 SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname) AS Driver
@@ -881,7 +881,7 @@ GROUP BY Driver.DriverId, Driver.Firstname, Driver.Lastname, Race.RaceYear
 ORDER BY SUM(IIF(Result.Position = 1, 1, 0)) * 1.0 / COUNT(1) DESC;
 ```
 
-#### A.6.2.2. Resultaten
+#### Resultaten
 
 | Driver             | Season | Races | Wins | Percentage |
 |--------------------|--------|-------|------|------------|
@@ -903,7 +903,7 @@ ORDER BY SUM(IIF(Result.Position = 1, 1, 0)) * 1.0 / COUNT(1) DESC;
 | Jim Clark          | 1963   | 10    | 7    | 70.00%     |
 | ...                | ...    | ...   | ...  | ...        |
 
-#### A.6.2.3. Toelichting
+#### Toelichting
 
 Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van aparte CTE’s voor het aantal races 
 en het aantal overwinningen, worden beide waarden direct binnen één GROUP BY berekend.
@@ -914,11 +914,11 @@ Per coureur en seizoen telt `COUNT(1)` het totaal aantal gereden races. Het aant
 Daarna wordt het winstpercentage direct berekend met dezelfde waarden. Ook hier zorgt `NULLIF` ervoor dat delen door nul 
 wordt voorkomen. Deze aanpak is korter en overzichtelijker, omdat alle aggregaties in één stap worden uitgevoerd.
 
-#### A.6.2.4. Query plan
+#### Query plan
 
 ![Queryplan alternatieve implementatie](./assets/6-alternative-query-plan.png)
 
-#### A.6.2.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_RaceId_index
@@ -926,11 +926,11 @@ create index Result_RaceId_index
 go
 ```
 
-## A.7. Maak de eindstand voor de coureurs van 2021 na. Zie onderstaand overzicht voor de juiste punten.
+## Maak de eindstand voor de coureurs van 2021 na. Zie onderstaand overzicht voor de juiste punten.
 
-### A.7.1. Invoegen extra gegevens
+### Invoegen extra gegevens
 
-#### A.7.1.1. Query
+#### Query
 
 ```sql
 -- Create helper function for splitting strings.
@@ -1090,7 +1090,7 @@ WHERE NOT EXISTS (SELECT 1
                     AND r.DriverId = d.DriverId);
 ```
 
-#### A.7.1.2. Toelichting
+#### Toelichting
 
 Om de gegevens in te laden heb ik deze handmatig moeten uitlezen van het CSV formaat. Helaas omdat ik Docker gebruik,
 was het eenvoudig inladen van CSV bestanden met de ingebouwde functies niet mogelijk; vandaar dat ik het zelf heb
@@ -1101,9 +1101,9 @@ waarbij er in iedere stap op basis van de gegevens uit de tijdelijke tabel (en e
 worden gemaakt. Hierbij is er ook zo veel mogelijk gedaan om te checken dat er geen duplicate rijen worden toegevoegd
 (dit door middel van NOT EXISTS met een subquery).
 
-### A.7.2. Primaire Uitwerking
+### Primaire Uitwerking
 
-#### A.7.2.1. Query
+#### Query
 
 ```sql
 SELECT DriverStanding.Position                  AS POS
@@ -1124,7 +1124,7 @@ WHERE Race.RaceYear = 2021
 ORDER BY DriverStanding.Position;
 ```
 
-#### A.7.2.2. Resultaten
+#### Resultaten
 
 | POS | DRIVER           | NATIONALITY | CAR            | PTS            |
 |-----|------------------|-------------|----------------|----------------|
@@ -1141,7 +1141,7 @@ ORDER BY DriverStanding.Position;
 | 11  | Esteban Ocon     | French      | Alpine F1 Team | 74.0000000000  |
 | ... | ...              | ...         | ...            | ...            |
 
-#### A.7.2.3. Toelichting
+#### Toelichting
 
 Deze query maakt de eindstand van het coureurskampioenschap van 2021 na. Hiervoor wordt gebruikgemaakt van de tabel 
 DriverStanding, waarin de stand per race is opgeslagen. Door te filteren op het seizoen 2021 en de laatste race van 
@@ -1154,11 +1154,11 @@ gebruikt om de constructor te bepalen waarmee de coureur in die race heeft gered
 Tot slot wordt gesorteerd op DriverStanding.Position, zodat de eindstand in de juiste volgorde wordt weergegeven: van 
 kampioen naar lager geklasseerde coureurs.
 
-#### A.7.2.4. Query plan
+#### Query plan
 
 ![Queryplan primaire implementatie](./assets/7-primary-query-plan.png)
 
-#### A.7.2.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_RaceId_index
@@ -1170,9 +1170,9 @@ create index DriverStanding_RaceId_index
 go
 ```
 
-### A.7.3. Alternatieve Uitwerking
+### Alternatieve Uitwerking
 
-#### A.7.3.1. Query
+#### Query
 
 ```sql
 SELECT DriverStanding.Position                  AS POS
@@ -1198,7 +1198,7 @@ WHERE Race.RaceYear = 2021
 ORDER BY DriverStanding.Position;
 ```
 
-#### A.7.3.2. Resultaten
+#### Resultaten
 
 | POS | DRIVER           | NATIONALITY | CAR            | PTS            |
 |-----|------------------|-------------|----------------|----------------|
@@ -1215,7 +1215,7 @@ ORDER BY DriverStanding.Position;
 | 11  | Esteban Ocon     | French      | Alpine F1 Team | 74.0000000000  |
 | ... | ...              | ...         | ...            | ...            |
 
-#### A.7.3.3. Toelichting
+#### Toelichting
 
 Deze alternatieve query haalt dezelfde eindstand op, maar bepaalt de constructor via een `CROSS APPLY`. Per coureur 
 wordt binnen de laatste race van 2021 het bijbehorende resultaat opgezocht en daaruit de ConstructorId gehaald. Met 
@@ -1227,11 +1227,11 @@ expliciet gekeken naar de meest recente racedatum binnen het seizoen, in plaats 
 Daarna worden de gegevens gekoppeld aan DriverStanding, Driver, Race en Constructor. Het eindresultaat is hetzelfde 
 overzicht van de eindstand, inclusief positie, coureur, nationaliteit, constructor en punten.
 
-#### A.7.3.4. Query plan
+#### Query plan
 
 ![Queryplan alternatieve implementatie](./assets/7-alternative-query-plan.png)
 
-#### A.7.3.5. Aanbevolen indexen
+#### Aanbevolen indexen
 
 ```sql
 create index Result_RaceId_DriverId_index
