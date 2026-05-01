@@ -129,12 +129,12 @@ ORDER BY DriverCompletion.MinCompletion DESC;
 
 Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van eerst in een aparte 
 CTE het maximale aantal ronden per race te bepalen, gebruikt deze query een window function: 
-MAX(Result.Laps) OVER (PARTITION BY Race.RaceId). Daarmee wordt per race direct het maximale 
+`MAX(Result.Laps) OVER (PARTITION BY Race.RaceId)`. Daarmee wordt per race direct het maximale 
 aantal gereden ronden bepaald, zonder dat hiervoor een aparte aggregatie en join nodig is.
 
 Per resultaatregel wordt vervolgens berekend welk deel van de raceafstand de coureur heeft voltooid. 
 Daarna wordt per coureur opnieuw het laagste voltooiingspercentage over alle races bepaald met 
-MIN(Completion). Dit minimum geeft aan wat de laagste racevoltooiing van de coureur in 2024 was.
+`MIN(Completion)`. Dit minimum geeft aan wat de laagste racevoltooiing van de coureur in 2024 was.
 
 Tot slot filtert de query op coureurs met een minimale voltooiing van 90% of hoger. Het 
 eindresultaat is daardoor gelijk aan de primaire uitwerking, maar de query is korter doordat de 
@@ -211,6 +211,17 @@ ORDER BY CircuitName, FastestLapTime;
 
 #### A.2.1.3. Toelichting
 
+Deze query zoekt per race tussen 2004 en 2024 de snelste rondetijd. In de CTE FastestRaceResult wordt voor elke race 
+met een subquery het ResultId opgehaald van het resultaat met de laagste FastestLapTime. Resultaten zonder snelste 
+rondetijd worden hierbij uitgesloten.
+
+Daarna wordt dit snelste resultaat gekoppeld aan de tabellen Race, Driver, Circuit en ResultStatus. Hierdoor kan de 
+query naast de snelste rondetijd ook extra informatie tonen, zoals het circuit, de racedatum, de coureur, het 
+rondenummer, de eindpositie, punten, het totaal aantal gereden rondes en de resultstatus.
+
+Tot slot wordt het resultaat gesorteerd op circuitnaam en daarna op rondetijd. Daardoor staan de snelste rondes per 
+circuit gegroepeerd, met binnen elk circuit de snelste tijden bovenaan.
+
 #### A.2.1.4. Query plan
 
 ![Queryplan primaire implementatie](./assets/2-primary-query-plan.png)
@@ -286,6 +297,17 @@ ORDER BY CircuitName, FastestLapTime;
 | ...                            | ...        | ...                | ...        | ...              | ...      | ...     | ...  | ...          | 
 
 #### A.2.2.3. Toelichting
+
+Deze alternatieve query gebruikt een window function om per race de snelste ronde te bepalen. In de CTE RankedResults 
+krijgen alle resultaten met een ingevulde FastestLapTime een rangnummer per race via `ROW_NUMBER() OVER (PARTITION 
+BY r.RaceId ORDER BY res.FastestLapTime)`. Het resultaat met rangnummer 1 is dus de snelste ronde van die race.
+
+In de hoofdquery worden alleen de regels met rn = 1 geselecteerd. Daarna worden deze gekoppeld aan de tabellen Race, 
+Driver, Circuit en ResultStatus, zodat alle gevraagde gegevens kunnen worden weergegeven.
+
+Deze aanpak levert hetzelfde resultaat op als de primaire uitwerking, maar is vaak overzichtelijker omdat de 
+selectie van de snelste ronde expliciet via rangschikking gebeurt. Ook sluit deze vorm goed aan op de aanbevolen 
+indexen, omdat er per race wordt geordend op FastestLapTime.
 
 #### A.2.2.4. Query plan
 
@@ -392,6 +414,18 @@ ORDER BY SeasonWinner.RaceYear;
 
 #### A.3.1.3. Toelichting
 
+Deze query bepaalt per seizoen tussen 2015 en 2024 wie aan het einde van het seizoen bovenaan stond in de 
+coureursstand. Dit gebeurt in SeasonWinner, waar per seizoen wordt gekeken naar de laatste race van dat jaar en de 
+coureur met positie 1 in de stand.
+
+Daarna wordt voor deze kampioen per race opgehaald welke positie hij na elke race in de stand had. Met FirstUnbrokenP1 
+wordt bepaald vanaf welk moment de kampioen op positie 1 stond en daarna niet meer van die eerste plek is afgeweken. 
+Dit gebeurt door te zoeken naar de eerste race ná de laatste keer dat de kampioen lager dan eerste stond.
+
+Daarnaast berekent de query het totaal aantal races in het seizoen en het aantal races dat de kampioen daadwerkelijk 
+heeft gewonnen. In het eindresultaat worden deze gegevens gecombineerd met de datum, het volgnummer en de naam van de 
+race vanaf waar de kampioen de leiding definitief behield.
+
 #### A.3.1.4. Query plan
 
 ![Queryplan primaire implementatie](./assets/3-primary-query-plan.png)
@@ -471,6 +505,18 @@ ORDER BY SeasonWinner.RaceYear;
 | 2024    | Max Verstappen | 9        | 24          | 2024-03-02  | 1          | Bahrain Grand Prix    |
 
 #### A.3.2.3. Toelichting
+
+Deze alternatieve query bepaalt eerst op dezelfde manier de seizoenswinnaar: de coureur die na de laatste race van elk 
+seizoen tussen 2015 en 2024 bovenaan stond in de coureursstand.
+
+Daarna gebruikt de query meerdere `CROSS APPLY`-blokken om per kampioen direct aanvullende informatie op te halen. 
+Het eerste blok telt het totaal aantal races in dat seizoen. Het tweede blok telt hoeveel races de kampioen in dat 
+seizoen heeft gewonnen. Het derde blok zoekt de eerste race waarin de kampioen op positie 1 stond, zonder dat er 
+daarna nog een race volgde waarin hij lager dan eerste stond.
+
+De `NOT EXISTS`-voorwaarde controleert dus of de gekozen race echt het beginpunt is van de onafgebroken periode aan de 
+leiding. Het resultaat toont per seizoen de kampioen, zijn aantal overwinningen, het totaal aantal races en de race 
+vanaf waar hij de eerste plaats tot het einde vasthield.
 
 #### A.3.2.4. Query plan
 
@@ -566,24 +612,21 @@ GROUP BY DriverYearRange.DriverId;
 
 #### A.4.1.3. Toelichting
 
-Het uitwerken van dit vraagstuk was enorm complex, veel SQL databases hebben namelijk ingebouwde ondersteuning voor
-ranges, zoals postgres met intrange of tsrange; SQL Server heeft dit echter niet, hierdoor moest deze complete
-logica zelf geschreven worden.
+Deze query gebruikt de view DriverYearRanges om per coureur te tonen in welke seizoenen hij heeft deelgenomen aan 
+Formule 1-races. De hoofdquery zelf blijft daardoor eenvoudig: de coureurs worden gekoppeld aan de view en 
+alfabetisch gesorteerd op naam.
 
-Ik heb dit aangepakt door eerst een beeld te brengen welke jaren iedere driver meegedaan heeft aan races, hierna
-heb ik deze op volgorde gezet, waarbij ik door middel van de LAG() operatie met OVER() heb gekeken of de jaren die
-op volgorde staan, een opeenvolging van elkaar zijn. Indien deze niet matchen wordt er dan een nieuwe groep
-gestart (eigenlijk betekent dit: reeks opgebroken). Door middel van de SUM() operatie met OVER() heb ik daarna echte
-groepen gemaakt van jaren die bij elkaar horen; dit wordt dan in een volgende stap gebruikt om voor iedere groep de
-minimale en maximale jaartallen binnen te halen, waarbij ik ook een string-formatted variant opstel die of een range
-opstelt, of een enkel jaartal als een groep maar een jaar is.
+De complexiteit zit vooral in de view. Eerst wordt per coureur bepaald in welke unieke jaren hij aan races heeft 
+meegedaan. Daarna wordt met LAG() gekeken of een jaar direct aansluit op het vorige deelnamejaar van dezelfde coureur. 
+Als dat niet zo is, betekent dit dat er een onderbreking is geweest en dat er een nieuwe periode moet beginnen.
 
-Van deze hele operatie heb ik nader een view gemaakt (en het document ook hierop aangepast), omdat deze in veel
-hierna volgende vraagstukken gebruikt gaat worden. Hierdoor kan toekomstige code te overzien blijven.
+Vervolgens worden deze opeenvolgende jaren gegroepeerd. Per groep wordt het eerste en laatste jaar bepaald. Als een 
+groep maar uit één jaar bestaat, wordt alleen dat jaartal getoond. Als een groep meerdere opeenvolgende jaren bevat, 
+wordt dit weergegeven als periode, bijvoorbeeld 2007-2011.
 
-Tot slot heb ik veel pogingen gewaagd om een alternatieve implementatie hiervoor te bedenken, dit is mij echter
-niet gelukt. En zoals de opdracht stelde ‘indien mogelijk’; daarom heb ik na veel werk, dus gekozen om deze niet
-voort te zetten. Ik kreeg geen goede uitwerking die anders werkte.
+Tot slot worden alle periodes van dezelfde coureur samengevoegd met STRING_AGG. Hierdoor ontstaat per coureur één 
+overzicht met alle deelnameperiodes in chronologische volgorde. De view is apart aangemaakt omdat dezelfde 
+periode-indeling ook in latere queries opnieuw gebruikt kan worden.
 
 #### A.4.1.4. Query plan
 
@@ -648,6 +691,18 @@ ORDER BY DriverWin.Wins DESC;
 
 #### A.5.1.3. Toelichting
 
+Deze query maakt een overzicht van coureurs die in hun volledige carrière minimaal 25 races hebben gewonnen. 
+Eerst wordt in DriverEntry per coureur geteld aan hoeveel races hij heeft deelgenomen. Daarna wordt in DriverWin 
+per coureur geteld hoeveel van deze races hij heeft gewonnen, waarbij alleen resultaten met `Position = 1` meetellen.
+
+In de hoofdquery worden deze tellingen gekoppeld aan de tabel Driver, zodat de naam van de coureur getoond kan worden. 
+Ook wordt de view DriverYearRanges gebruikt om de seizoenen waarin de coureur actief was als één overzicht te tonen. 
+Hierdoor worden onderbroken carrières netjes weergegeven, bijvoorbeeld als meerdere periodes.
+
+Vervolgens worden alleen coureurs geselecteerd met minimaal 25 overwinningen. Het winstpercentage wordt berekend 
+door het aantal overwinningen te delen door het aantal deelnames en dit om te zetten naar een percentage. Tot 
+slot wordt gesorteerd op het aantal overwinningen, zodat de meest succesvolle coureurs bovenaan staan.
+
 #### A.5.1.4. Query plan
 
 ![Queryplan primaire implementatie](./assets/5-primary-query-plan.png)
@@ -704,6 +759,19 @@ WHERE Result.Wins >= 25;
 | Sebastian Vettel   | 2007-2022                  | 300     | 53   | 17.67%     |
 
 #### A.5.2.3. Toelichting
+
+Deze alternatieve query berekent het aantal deelnames en overwinningen per coureur met behulp van `CROSS APPLY` en 
+window functions. Voor elke coureur wordt in de gekoppelde subquery gekeken naar alle resultaten van die coureur. 
+Met `COUNT(*) OVER (PARTITION BY Result.DriverId)` wordt het totaal aantal deelnames bepaald, en 
+met `COUNT(CASE WHEN Result.Position = 1 THEN 1 END)` het aantal overwinningen.
+
+Omdat de window functions dezelfde waarden teruggeven voor meerdere resultaatregels van dezelfde coureur, wordt 
+`DISTINCT` gebruikt om uiteindelijk één regel per coureur over te houden. De deelnameperiodes worden opnieuw opgehaald 
+uit de view DriverYearRanges.
+
+Daarna filtert de query op coureurs met minimaal 25 overwinningen en berekent hij het winstpercentage op dezelfde 
+manier als de primaire uitwerking. Deze aanpak levert inhoudelijk hetzelfde resultaat op, maar gebruikt een andere 
+techniek: de tellingen worden niet vooraf in aparte CTE’s gegroepeerd, maar per coureur berekend binnen de `CROSS APPLY`.
 
 #### A.5.2.4. Query plan
 
@@ -771,11 +839,17 @@ ORDER BY COALESCE(DriverWins.Wins, 0) * 1.0 / DriverRaces.Races DESC;
 
 #### A.6.1.3. Toelichting
 
-De eerste oplossing voor het vraagstuk heb ik geimplementeerd door gebruik te maken van twee CTEs, een berekend het
-aantal wins per race, en de ander het totaal aantal races per bestuurder. Deze worden dan samengebracht waarbij het
-percentage berekend wordt. Tijdens het samenbrengen is er gekozen voor een left-join van de wins, omdat er niet
-altijd wins voor een jaar zullen zijn. Indien het een inner join zou zijn geweest, zouden enkel jaren met wins zichtbaar
-zijn.
+Deze query berekent per coureur en per seizoen welk percentage van zijn gereden races hij heeft gewonnen. Eerst 
+wordt in DriverWins per coureur en seizoen geteld hoeveel races hij heeft gewonnen. Daarna wordt in DriverRaces 
+per coureur en seizoen geteld aan hoeveel races hij totaal heeft deelgenomen.
+
+In de hoofdquery worden deze twee tellingen gecombineerd. Hierbij wordt een `LEFT JOIN` gebruikt, zodat ook seizoenen 
+waarin een coureur geen enkele race won toch in het resultaat blijven staan. Met `COALESCE` worden ontbrekende 
+overwinningen dan als 0 weergegeven.
+
+Het winstpercentage wordt berekend door het aantal overwinningen te delen door het aantal gereden races in dat seizoen. 
+`NULLIF` voorkomt hierbij dat er door nul gedeeld wordt. Tot slot wordt gesorteerd op het hoogste winstpercentage, 
+waardoor coureurs met het grootste aandeel gewonnen races bovenaan komen te staan.
 
 #### A.6.1.4. Query plan
 
@@ -831,10 +905,14 @@ ORDER BY SUM(IIF(Result.Position = 1, 1, 0)) * 1.0 / COUNT(1) DESC;
 
 #### A.6.2.3. Toelichting
 
-Voor de alternatieve implementatie heb ik de query korter proberen te maken. In deze nieuwe query wordt in een keer
-zowel het aantal wins, races en het percentage berekend. Dit is mogelijk door de IIF/NULLIF te gebruiken van SQL
-server, waarbij ik het tellen conditioneel maak (per groep), in plaats van filtering met een WHERE uit te voeren.
-Deze is daardoor veel korter, en heeft ook een simpeler queryplan.
+Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van aparte CTE’s voor het aantal races 
+en het aantal overwinningen, worden beide waarden direct binnen één GROUP BY berekend.
+
+Per coureur en seizoen telt `COUNT(1)` het totaal aantal gereden races. Het aantal overwinningen wordt berekend met 
+`SUM(IIF(Result.Position = 1, 1, 0))`: voor elke gewonnen race telt de query 1 op, en voor elke niet-gewonnen race 0.
+
+Daarna wordt het winstpercentage direct berekend met dezelfde waarden. Ook hier zorgt `NULLIF` ervoor dat delen door nul 
+wordt voorkomen. Deze aanpak is korter en overzichtelijker, omdat alle aggregaties in één stap worden uitgevoerd.
 
 #### A.6.2.4. Query plan
 
@@ -1065,6 +1143,17 @@ ORDER BY DriverStanding.Position;
 
 #### A.7.2.3. Toelichting
 
+Deze query maakt de eindstand van het coureurskampioenschap van 2021 na. Hiervoor wordt gebruikgemaakt van de tabel 
+DriverStanding, waarin de stand per race is opgeslagen. Door te filteren op het seizoen 2021 en de laatste race van 
+dat seizoen, wordt de definitieve eindstand geselecteerd.
+
+De query koppelt deze eindstand aan de tabellen Driver, Race, Result en Constructor. Daardoor kunnen naast de positie 
+en punten ook de naam, nationaliteit en auto/constructor van de coureur worden getoond. De koppeling met Result wordt 
+gebruikt om de constructor te bepalen waarmee de coureur in die race heeft gereden.
+
+Tot slot wordt gesorteerd op DriverStanding.Position, zodat de eindstand in de juiste volgorde wordt weergegeven: van 
+kampioen naar lager geklasseerde coureurs.
+
 #### A.7.2.4. Query plan
 
 ![Queryplan primaire implementatie](./assets/7-primary-query-plan.png)
@@ -1127,6 +1216,16 @@ ORDER BY DriverStanding.Position;
 | ... | ...              | ...         | ...            | ...            |
 
 #### A.7.3.3. Toelichting
+
+Deze alternatieve query haalt dezelfde eindstand op, maar bepaalt de constructor via een `CROSS APPLY`. Per coureur 
+wordt binnen de laatste race van 2021 het bijbehorende resultaat opgezocht en daaruit de ConstructorId gehaald. Met 
+`TOP 1` wordt één resultaatregel geselecteerd.
+
+Daarnaast wordt de laatste race van 2021 bepaald met `SELECT TOP 1 RaceId ... ORDER BY RaceDate DESC`. Daardoor wordt 
+expliciet gekeken naar de meest recente racedatum binnen het seizoen, in plaats van naar het hoogste RaceId.
+
+Daarna worden de gegevens gekoppeld aan DriverStanding, Driver, Race en Constructor. Het eindresultaat is hetzelfde 
+overzicht van de eindstand, inclusief positie, coureur, nationaliteit, constructor en punten.
 
 #### A.7.3.4. Query plan
 
