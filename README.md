@@ -633,7 +633,7 @@ go
 
 create index Result_DriverId_index
     on dbo.Result (DriverId)
-go
+    go
 ```
 
 ### A.5.2. Alternatieve Uitwerking
@@ -721,6 +721,26 @@ ORDER BY COALESCE(DriverWins.Wins, 0) * 1.0 / DriverRaces.Races DESC;
 
 #### A.6.1.2. Resultaten
 
+| Driver             | Season | Races | Wins | Percentage |
+|--------------------|--------|-------|------|------------|
+| Jim Rathmann       | 1960   | 1     | 1    | 100.00%    |
+| Sam Hanks          | 1957   | 1     | 1    | 100.00%    |
+| Jim Clark          | 1968   | 1     | 1    | 100.00%    |
+| Johnnie Parsons    | 1950   | 1     | 1    | 100.00%    |
+| Bob Sweikert       | 1955   | 1     | 1    | 100.00%    |
+| Troy Ruttman       | 1952   | 1     | 1    | 100.00%    |
+| Bill Vukovich      | 1953   | 1     | 1    | 100.00%    |
+| Pat Flaherty       | 1956   | 1     | 1    | 100.00%    |
+| Lee Wallard        | 1951   | 1     | 1    | 100.00%    |
+| Bill Vukovich      | 1954   | 1     | 1    | 100.00%    |
+| Jimmy Bryan        | 1958   | 1     | 1    | 100.00%    |
+| Max Verstappen     | 2023   | 22    | 19   | 86.36%     |
+| Alberto Ascari     | 1952   | 7     | 6    | 85.71%     |
+| Juan Fangio        | 1954   | 8     | 6    | 75.00%     |
+| Michael Schumacher | 2004   | 18    | 13   | 72.22%     |
+| Jim Clark          | 1963   | 10    | 7    | 70.00%     |
+| ...                | ...    | ...   | ...  | ...        |
+
 #### A.6.1.3. Toelichting
 
 De eerste oplossing voor het vraagstuk heb ik geimplementeerd door gebruik te maken van twee CTEs, een berekend het
@@ -731,7 +751,15 @@ zijn.
 
 #### A.6.1.4. Query plan
 
+![Queryplan primaire implementatie](./assets/6-primary-query-plan.png)
+
 #### A.6.1.5. Aanbevolen indexen
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+```
 
 ### A.6.2. Alternatieve Uitwerking
 
@@ -753,6 +781,26 @@ ORDER BY SUM(IIF(Result.Position = 1, 1, 0)) * 1.0 / COUNT(1) DESC;
 
 #### A.6.2.2. Resultaten
 
+| Driver             | Season | Races | Wins | Percentage |
+|--------------------|--------|-------|------|------------|
+| Johnnie Parsons    | 1950   | 1     | 1    | 100.00%    |
+| Lee Wallard        | 1951   | 1     | 1    | 100.00%    |
+| Troy Ruttman       | 1952   | 1     | 1    | 100.00%    |
+| Bill Vukovich      | 1953   | 1     | 1    | 100.00%    |
+| Bill Vukovich      | 1954   | 1     | 1    | 100.00%    |
+| Bob Sweikert       | 1955   | 1     | 1    | 100.00%    |
+| Pat Flaherty       | 1956   | 1     | 1    | 100.00%    |
+| Sam Hanks          | 1957   | 1     | 1    | 100.00%    |
+| Jimmy Bryan        | 1958   | 1     | 1    | 100.00%    |
+| Jim Rathmann       | 1960   | 1     | 1    | 100.00%    |
+| Jim Clark          | 1968   | 1     | 1    | 100.00%    |
+| Max Verstappen     | 2023   | 22    | 19   | 86.36%     |
+| Alberto Ascari     | 1952   | 7     | 6    | 85.71%     |
+| Juan Fangio        | 1954   | 8     | 6    | 75.00%     |
+| Michael Schumacher | 2004   | 18    | 13   | 72.22%     |
+| Jim Clark          | 1963   | 10    | 7    | 70.00%     |
+| ...                | ...    | ...   | ...  | ...        |
+
 #### A.6.2.3. Toelichting
 
 Voor de alternatieve implementatie heb ik de query korter proberen te maken. In deze nieuwe query wordt in een keer
@@ -762,7 +810,15 @@ Deze is daardoor veel korter, en heeft ook een simpeler queryplan.
 
 #### A.6.2.4. Query plan
 
+![Queryplan alternatieve implementatie](./assets/6-alternative-query-plan.png)
+
 #### A.6.2.5. Aanbevolen indexen
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, Position)
+go
+```
 
 ## A.7. Maak de eindstand voor de coureurs van 2021 na. Zie onderstaand overzicht voor de juiste punten.
 
