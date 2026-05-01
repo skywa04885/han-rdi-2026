@@ -604,11 +604,37 @@ ORDER BY DriverWin.Wins DESC;
 
 #### A.5.1.2. Resultaten
 
+| Driver             | Seasons                    | Entries | Wins | Percentage |
+|--------------------|----------------------------|---------|------|------------|
+| Lewis Hamilton     | 2007-2024                  | 356     | 105  | 29.49%     |
+| Michael Schumacher | 1991-2006, 2010-2012       | 308     | 91   | 29.55%     |
+| Max Verstappen     | 2015-2024                  | 209     | 63   | 30.14%     |
+| Sebastian Vettel   | 2007-2022                  | 300     | 53   | 17.67%     |
+| Alain Prost        | 1980-1991, 1993            | 202     | 51   | 25.25%     |
+| Ayrton Senna       | 1984-1994                  | 162     | 41   | 25.31%     |
+| Fernando Alonso    | 2001, 2003-2018, 2021-2024 | 404     | 32   | 7.92%      |
+| Nigel Mansell      | 1980-1992, 1994-1995       | 192     | 31   | 16.15%     |
+| Jackie Stewart     | 1965-1973                  | 100     | 27   | 27%        |
+| Niki Lauda         | 1971-1979, 1982-1985       | 174     | 25   | 14.37%     |
+| Jim Clark          | 1960-1968                  | 73      | 25   | 34.25%     |
+
 #### A.5.1.3. Toelichting
 
 #### A.5.1.4. Query plan
 
+![Queryplan primaire implementatie](./assets/5-primary-query-plan.png)
+
 #### A.5.1.5. Aanbevolen indexen
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+
+create index Result_DriverId_index
+    on dbo.Result (DriverId)
+go
+```
 
 ### A.5.2. Alternatieve Uitwerking
 
@@ -635,9 +661,25 @@ WHERE Result.Wins >= 25;
 
 #### A.5.2.2. Resultaten
 
+| Driver             | Seasons                    | Entries | Wins | Percentage |
+|--------------------|----------------------------|---------|------|------------|
+| Alain Prost        | 1980-1991, 1993            | 202     | 51   | 25.25%     |
+| Ayrton Senna       | 1984-1994                  | 162     | 41   | 25.31%     |
+| Fernando Alonso    | 2001, 2003-2018, 2021-2024 | 404     | 32   | 7.92%      |
+| Jackie Stewart     | 1965-1973                  | 100     | 27   | 27%        |
+| Jim Clark          | 1960-1968                  | 73      | 25   | 34.25%     |
+| Lewis Hamilton     | 2007-2024                  | 356     | 105  | 29.49%     |
+| Max Verstappen     | 2015-2024                  | 209     | 63   | 30.14%     |
+| Michael Schumacher | 1991-2006, 2010-2012       | 308     | 91   | 29.55%     |
+| Nigel Mansell      | 1980-1992, 1994-1995       | 192     | 31   | 16.15%     |
+| Niki Lauda         | 1971-1979, 1982-1985       | 174     | 25   | 14.37%     |
+| Sebastian Vettel   | 2007-2022                  | 300     | 53   | 17.67%     |
+
 #### A.5.2.3. Toelichting
 
 #### A.5.2.4. Query plan
+
+![Queryplan alternatieve implementatie](./assets/5-alternative-query-plan.png)
 
 #### A.5.2.5. Aanbevolen indexen
 
