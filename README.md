@@ -1020,11 +1020,38 @@ ORDER BY DriverStanding.Position;
 
 #### A.7.2.2. Resultaten
 
+| POS | DRIVER           | NATIONALITY | CAR            | PTS            |
+|-----|------------------|-------------|----------------|----------------|
+| 1   | Max Verstappen   | Dutch       | Red Bull       | 395.5000000000 |
+| 2   | Lewis Hamilton   | British     | Mercedes       | 387.5000000000 |
+| 3   | Valtteri Bottas  | Finnish     | Mercedes       | 226.0000000000 |
+| 4   | Sergio Pérez     | Mexican     | Red Bull       | 190.0000000000 |
+| 5   | Carlos Sainz     | Spanish     | Ferrari        | 164.5000000000 |
+| 6   | Lando Norris     | British     | McLaren        | 160.0000000000 |
+| 7   | Charles Leclerc  | Monegasque  | Ferrari        | 159.0000000000 |
+| 8   | Daniel Ricciardo | Australian  | McLaren        | 115.0000000000 |
+| 9   | Pierre Gasly     | French      | AlphaTauri     | 110.0000000000 |
+| 10  | Fernando Alonso  | Spanish     | Alpine F1 Team | 81.0000000000  |
+| 11  | Esteban Ocon     | French      | Alpine F1 Team | 74.0000000000  |
+| ... | ...              | ...         | ...            | ...            |
+
 #### A.7.2.3. Toelichting
 
 #### A.7.2.4. Query plan
 
+![Queryplan primaire implementatie](./assets/7-primary-query-plan.png)
+
 #### A.7.2.5. Aanbevolen indexen
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, ConstructorId)
+go
+
+create index DriverStanding_RaceId_index
+    on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
+go
+```
 
 ### A.7.3. Alternatieve Uitwerking
 
@@ -1056,8 +1083,35 @@ ORDER BY DriverStanding.Position;
 
 #### A.7.3.2. Resultaten
 
+| POS | DRIVER           | NATIONALITY | CAR            | PTS            |
+|-----|------------------|-------------|----------------|----------------|
+| 1   | Max Verstappen   | Dutch       | Red Bull       | 395.5000000000 |
+| 2   | Lewis Hamilton   | British     | Mercedes       | 387.5000000000 |
+| 3   | Valtteri Bottas  | Finnish     | Mercedes       | 226.0000000000 |
+| 4   | Sergio Pérez     | Mexican     | Red Bull       | 190.0000000000 |
+| 5   | Carlos Sainz     | Spanish     | Ferrari        | 164.5000000000 |
+| 6   | Lando Norris     | British     | McLaren        | 160.0000000000 |
+| 7   | Charles Leclerc  | Monegasque  | Ferrari        | 159.0000000000 |
+| 8   | Daniel Ricciardo | Australian  | McLaren        | 115.0000000000 |
+| 9   | Pierre Gasly     | French      | AlphaTauri     | 110.0000000000 |
+| 10  | Fernando Alonso  | Spanish     | Alpine F1 Team | 81.0000000000  |
+| 11  | Esteban Ocon     | French      | Alpine F1 Team | 74.0000000000  |
+| ... | ...              | ...         | ...            | ...            |
+
 #### A.7.3.3. Toelichting
 
 #### A.7.3.4. Query plan
 
+![Queryplan alternatieve implementatie](./assets/7-alternative-query-plan.png)
+
 #### A.7.3.5. Aanbevolen indexen
+
+```sql
+create index Result_RaceId_DriverId_index
+    on dbo.Result (RaceId, DriverId)
+go
+
+create index DriverStanding_RaceId_index
+    on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
+go
+```
