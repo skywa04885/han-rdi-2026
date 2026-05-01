@@ -152,6 +152,31 @@ create index Result_RaceId_index
 go
 ```
 
+### Vergelijking
+
+Hoewel beide query-plannen redelijk op elkaar lijken, is een van de eerste dingen die mij wel opvalt dat de alternatieve
+implementatie twee keer de Driver tabel raadpleegt, waarvan de eerste een *Index Scan* is en de tweede een *Index Seek*.
+De primaire implementatie daarentegen, voert enkel de laatste operation uit, namelijk de *Index Seek*. Dit is veel
+efficiënter omdat enkel in het laatste stadium de relevante drivers op worden gehaald.
+
+Een van de andere dingen die opvalt, is dat de alternatieve implementatie veel *Spooling* heeft, namelijk 3 operators
+in totaal. Dit is op zich best logisch, want dit komt vaak voor als *Nested Loops* joins gebruikt worden, wat hier het 
+geval is; deze hebben namelijk als doel om te voorkomen dat data meerdere keren opnieuw wordt gelezen. Dit is helaas
+niet direct goed nieuws, want ze kunnen mogelijk veel extra geheugen gebruiken, en soms zelfs ook zorgen voor disk IO.
+In dit geval is dat niet zozeer zorgelijk, want de daadwerkelijke aantallen van rijen vallen best mee, maar nog steeds
+heb je liever geen spooling.
+
+Buiten deze twee stukken om valt er niet enorm veel op aan de queries, andere operators als sorting en filtering
+zijn best vergelijkbaar, al bevinden ze zich op andere stukken in het plan. Deze voorgaande twee inzichten zijn dus
+de dingen die direct opvallen bij het vergelijken van deze twee query-plannen.
+
+### Voorkeur
+
+Gezien het feit dat de primaire implementatie de Driver tabel efficiënter raadpleegt, en daarnaast geen spooling 
+gebruikt, heeft deze onze voorkeur. Ook als we naar stijl kijken, heeft de primaire de voorkeur, deze breekt het
+proces namelijk op in duidelijkere stappen, in plaats van het proberen samen te voegen van meerdere stappen; wel moet
+er nog worden opgemerkt dat de tweede wel compacter is, wat voor sommige de voorkeur kan hebben.
+
 ## Van 2004 tot en met 2024: per race de snelste ronde met circuit, racedatum, coureur, rondenummer, rondetijd, positie, punten, totaal aantal rondes en resultstatus; gesorteerd op circuit en daarna op rondetijd.
 
 ### Primaire Uitwerking
