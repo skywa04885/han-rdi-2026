@@ -516,6 +516,26 @@ GROUP BY DriverYearRange.DriverId;
 
 #### A.4.1.2. Resultaten
 
+| Coureur         | Periodes                   |
+|-----------------|----------------------------|
+| Adolf Brudes    | 1952                       |
+| Adolfo Cruz     | 1953                       |
+| Adrián Campos   | 1987-1988                  |
+| Adrian Sutil    | 2007-2011, 2013-2014       |
+| Aguri Suzuki    | 1988-1995                  |
+| Al Herman       | 1955-1957, 1959-1960       |
+| Al Keller       | 1955-1959                  |
+| Al Pease        | 1967, 1969                 |
+| Alain de Changy | 1959                       |
+| Alain Prost     | 1980-1991, 1993            |
+| Alan Brown      | 1952-1954                  |
+| Alan Jones      | 1975-1981, 1983, 1985-1986 |
+| Alan Rees       | 1967                       |
+| Alan Rollinson  | 1965                       |
+| Alan Stacey     | 1958-1960                  |
+| Albert Scherrer | 1953                       |
+| ...             | ...                        |
+
 #### A.4.1.3. Toelichting
 
 Het uitwerken van dit vraagstuk was enorm complex, veel SQL databases hebben namelijk ingebouwde ondersteuning voor
@@ -539,7 +559,15 @@ voort te zetten. Ik kreeg geen goede uitwerking die anders werkte.
 
 #### A.4.1.4. Query plan
 
+![Queryplan primaire implementatie](./assets/4-primary-query-plan.png)
+
 #### A.4.1.5. Aanbevolen indexen
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+```
 
 ## A.5. Maak een overzicht van alle F1 coureurs die in hun volledige carrière 25 of meer wedstrijden hebben gewonnen. Toon per coureur zijn naam, in één veld een overzicht van de seizoenen waarin hij gereden heeft (ontbrekende jaren weglaten), het aantal races dat hij gestart is, het aantal races die hij gewonnen heeft en het percentage van het aantal races die hij gewonnen heeft ten opzichte van het aantal races dat hij gestart is. Een voorbeeld van hoe het er voor Michael Schumacher en Ayrton Senna uitziet, zie je hieronder.
 
