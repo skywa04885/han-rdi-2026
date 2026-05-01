@@ -55,9 +55,24 @@ ORDER BY MinCompletion.MinCompletion DESC;
 
 #### A.1.1.3. Toelichting
 
-![Queryplan primaire implementatie](./assets/1-primary-query-plan.png)
+Deze query bepaalt per race in het seizoen 2024 hoeveel ronden er maximaal zijn gereden. 
+Dit maximum wordt gebruikt als benadering voor het totaal aantal ronden van die race. 
+Daarna wordt per coureur opgehaald hoeveel ronden die coureur in elke race heeft gereden.
+
+Vervolgens berekent de query per coureur en per race het voltooiingspercentage door het aantal 
+gereden ronden van de coureur te delen door het maximale aantal ronden van die race. 
+Daarna wordt per coureur het laagste voltooiingspercentage over alle races bepaald. 
+Dit laagste percentage geeft dus aan hoe goed de coureur het slechtst gepresteerde 
+raceweekend heeft voltooid.
+
+In de laatste stap worden alleen coureurs getoond waarvan dit minimum minimaal 90% is. 
+Daarmee blijven alleen coureurs over die in elke gereden race van 2024 ten minste 90% van 
+de raceafstand hebben afgelegd. De namen worden opgehaald uit de tabel Driver, en het 
+percentage wordt afgerond en weergegeven als tekstwaarde.
 
 #### A.1.1.4. Query plan
+
+![Queryplan primaire implementatie](./assets/1-primary-query-plan.png)
 
 #### A.1.1.5. Aanbevolen indexen
 
@@ -111,6 +126,19 @@ ORDER BY DriverCompletion.MinCompletion DESC;
 | Lando Norris   | 90%        |
 
 #### A.1.2.3. Toelichting
+
+Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van eerst in een aparte 
+CTE het maximale aantal ronden per race te bepalen, gebruikt deze query een window function: 
+MAX(Result.Laps) OVER (PARTITION BY Race.RaceId). Daarmee wordt per race direct het maximale 
+aantal gereden ronden bepaald, zonder dat hiervoor een aparte aggregatie en join nodig is.
+
+Per resultaatregel wordt vervolgens berekend welk deel van de raceafstand de coureur heeft voltooid. 
+Daarna wordt per coureur opnieuw het laagste voltooiingspercentage over alle races bepaald met 
+MIN(Completion). Dit minimum geeft aan wat de laagste racevoltooiing van de coureur in 2024 was.
+
+Tot slot filtert de query op coureurs met een minimale voltooiing van 90% of hoger. Het 
+eindresultaat is daardoor gelijk aan de primaire uitwerking, maar de query is korter doordat de 
+raceafstand via een window function binnen dezelfde tussenstap wordt berekend.
 
 #### A.1.2.4. Query plan
 
