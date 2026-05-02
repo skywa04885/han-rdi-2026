@@ -1314,3 +1314,159 @@ create index DriverStanding_RaceId_index
     on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
 go
 ```
+
+# Indexeren (D)
+
+Tijdens het uitwerken van de bevragingen in opdracht A zijn diverse indexen naar boven gekomen die
+aanbevolen zijn door ide SQL-Server/IDE. Tijdens deze opdracht zullen deze aanbevelingen bekeken
+en toegepast worden. Hierbij zullen eerst alle aanbevelingen samen worden gebracht, zodat hier
+goed naar gekeken kan worden, hierna zullen deze worden besproken, vergeleken en samengevoegd, 
+waarna deze uit zullen worden gewerkt met daarna tot slot een korte kijk naar de optimalisaties,
+en of het verandering brengt in onze queries van voorkeur.
+
+## Aanbevolen indexen
+
+Hieronder volgt een stuk SQL-code waarin alle indexen die aanbevolen zijn door de SQL-Server/IDE
+plaatsvinden. Deze zijn onderverdeeld per bevraging.
+
+```sql
+-- Welke coureurs zijn in alle races van het seizoen 2024 ge-finished?
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (Laps)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, Laps)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, Laps)
+go
+
+-- Van 2004 tot en met 2024: per race de snelste ronde met circuit, 
+--  racedatum, coureur, rondenummer, rondetijd, positie, punten, 
+--  totaal aantal rondes en resultstatus; gesorteerd op circuit en 
+--  daarna op rondetijd.
+create index Result_FastestLapTime_index
+    on dbo.Result (FastestLapTime) include (RaceId, DriverId, PositionText, 
+        Points, Laps, FastestLap, ResultStatusId)
+go
+
+create index Result_RaceId_FastestLapTime_index
+    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText, 
+        Points, Laps, FastestLap, ResultStatusId)
+go
+
+-- Welke coureurs hebben na deelname van een of meerdere seizoenen 
+--  een periode niet deelgenomen en zijn in een later seizoen weer 
+--  teruggekeerd in de Formule 1?
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+
+-- Maak een overzicht van alle F1 coureurs die in hun volledige 
+--  carrière 25 of meer wedstrijden hebben gewonnen.
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+
+create index Result_DriverId_index
+    on dbo.Result (DriverId)
+    go
+
+-- Er zijn niet ieder jaar evenveel wedstrijden gereden. 
+--  Daarom is het interessant om te zien welke coureur 
+--  procentueel de meeste races per seizoen heeft gewonnen.
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, Position)
+go
+
+-- Maak de eindstand voor de coureurs van 2021 na.
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, ConstructorId)
+go
+
+create index DriverStanding_RaceId_index
+    on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
+go
+
+create index Result_RaceId_DriverId_index
+    on dbo.Result (RaceId, DriverId)
+go
+
+create index DriverStanding_RaceId_index
+    on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
+go
+```
+
+## Vergelijking van indexen
+
+Om te beginnen met het vergelijken van de aanbevolen indexen, is het belangrijk om inzicht
+te krijgen in welke aanbevelingen er zijn gemaakt. In deze sectie worden relevante aanbevelingen
+samengebracht, vergeleken en aangepast.
+
+### Index op RaceId in Result
+
+Een van de meest aanbevolen indexen was die op de `Result` tabel, en dan specifiek op 
+de `RaceId` kolom. Hieronder volgen alle aanbevolen indexen voor deze tabel en kolom.
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (Laps)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, Laps)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, Laps)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, Position)
+go
+
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, ConstructorId)
+go
+```
+
+Wat in deze indexen opvalt, is dat ze eigenlijk enorm veel op elkaar lijken. Bijna iedere index wordt aanbevolen
+om de `DriverId` kolom te bevatten, en meerdere bevelen ook de `Laps` kolom aan. Dit is iets dat erg logisch is,
+want de queries waarbij deze aanbevolen zijn, werken veel met die twee kolommen, en het includeren van deze in de
+index zal daardoor voorkomen dat er nog key lookups plaats moeten vinden, wat direct zorgt voor minder IO, want
+de database heeft direct in de index toegang tot die gegevens, zonder de onderliggende clustered index ook een seek
+moet krijgen.
+
+Sommige indexen bevelen ook de `Position` en `ConstructorId` kolommen aan, hier zijn wij echter niet helemaal mee
+eens dat deze toegevoegd moeten worden, want deze zijn niet relevant voor de meeste queries; terwijl ze wel de
+indexen zullen vergroten (meer geheugen en disk-space). De `DriverId` en `Laps` worden echter wel vaker gebruikt,
+waardoor de afweging het waard zou zijn.
+
+Volgens ons is de volgende index dus het meest verstandig, deze index op de `Result` table met de `RaceId` kolom,
+biedt direct toegang tot zowel de `DriverId` als `Laps` zonder extra key lookup. Deze index is dan ook non-clustered,
+want is secondair, de clustered index zou dan nog raadgepleegd moeten worden om bij `Position` en `ConstructorId` te
+komen. Dit is dus onze conclusie van de vergelijking, een samenkomst van alle indexen.
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId) include (DriverId, Laps)
+go
+```
