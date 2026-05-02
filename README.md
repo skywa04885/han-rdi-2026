@@ -1470,3 +1470,37 @@ create index Result_RaceId_index
     on dbo.Result (RaceId) include (DriverId, Laps)
 go
 ```
+
+### Index op RaceId van DriverStanding
+
+Voor de `DriverStanding` tabel heeft de SQL-Server/IDE de volgende twee indexen aanbevolen.
+
+```sql
+create index DriverStanding_RaceId_index
+    on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
+go
+
+create index DriverStanding_RaceId_index
+    on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
+go
+```
+
+Zoals te zien is zijn ze precies hetzelfde, en hoeven we daarom enkel een index te behandelen.
+
+```sql
+create index DriverStanding_RaceId_index
+    on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
+go
+```
+
+Het eerste dat opvalt is dat zowel de `DriverId`, `Points` en `Position` kolommen aanbevolen worden
+om meegenomen te worden in de index. Wij zijn van mening dat een index eigenlijk zo weinig mogelijk
+includes moet bevatten, tenzij het echt nodig is. Om te voorkomen dat indexen groot worden en frequent
+aangepast worden.
+
+In deze situatie is het echter wel een interessante keuze, na onderzoek te doen naar de impact van included
+columns, zijn wij erachter gekomen dat deze serieuze impact hebben op *Nested Loop* operations, hierbij wordt
+dan voorkomen dat er een key-lookup plaats hoeft te vinden, per iteratie. In dit geval blijkt ook, dat de
+bevragingen waaruit deze aanbeveling kwam, gebruik maken van *Nested Loop* operators. Hierdoor is deze index
+wel een serieuze kandidaat, die voor flinke speedup kan zorgen. Daarom kiezen wij om deze aanbevolen kolommen
+te behouden.
