@@ -576,6 +576,42 @@ vanaf waar hij de eerste plaats tot het einde vasthield.
 
 Er zijn geen indexen voorgesteld door de database management tool voor deze query.
 
+### Vergelijking
+
+Deze vergelijking zal voor ons vooral gaan over onderhoudbaarheid. Zoals eerder zichtbaar in de queryplannen, is het
+queryplan van de primaire query zo groot dat deze niet eens met de standaard diagram tool opgeslagen kon worden,
+en daarom omgezet moest worden naar een Draw.IO diagram. Dit omdat deze query abnormaal veel operators heeft om
+tot een resultaat te komen, voor onderhoud, is dit een heel slecht iets, indien er in de toekomst aanpassingen
+gemaakt moeten worden, of optimalisaties, is het queryplan gewoon te uitgebreid en overweldigend.
+
+Zowel de primaire als alternatieve implementatie maken gebruik van *Spooling*, de primaire echter wel veel meer dan 
+de alternatieve implementatie. Ook worden dezelfde indexen, tabellen in de primaire implementatie heel erg veel
+dubbel gebruikt en gelezen, dit zorgt voor veel meer IO operaties dan de alternatieve implementatie; die het nog steeds dubbel doet, maar magnitudes minder.
+
+Verder worden er veel meer *Sort* operators gebruikt in de primarie implementatie, sorteren is duur, en moet eingelijk
+zo veel mogelijk voorkomen worden, indien volgorde nodig is, zou dit eigenlijk uit indexen moeten komen. Het feit
+dat de primaire veel meer sorteert, maakt deze in veregelijking tot de alternatieve, dus ook veel minder goed.
+
+Een van de andere dingen die erg opvalt, is dat de primaire implementatie nog werkt met extreem grote
+datasets, zelfs al is dit hogerop in de operator tree, hierbij wordt er dus ook veel filtering pas in
+latere stadia toegepast. De alternatieve implementatie lijkt in redelijk vroege stadia de dataset
+al erg compact te krijgen, en voert geen filtering tussendoor. Dit mede omdat de *Join* operators in
+vroege stadia de dataset al enorm verkleinen. 
+
+Qua stijl, heeft de alternatieve implementatie ook onze voorkeur, deze is veel compacter en
+makkelijker te lezen/ onderhouden, omdat deze minder complex is. Hierbij is ook direct zichtbaar
+dat een minder complexe query, ook tot een simpeler queryplan kan leiden.
+
+### Voorkeur
+
+Onze voorkeur gaat daarom ook uit voor de alternatieve implementatie, niet alleen is deze simpeler
+om mee te werken, wegens zowel de query zelf, als het compacte queryplan. Ook is deze veel
+efficienter en maakt de dataset waarop gewerkt wordt al erg vroeg compact.
+
+Deze primaire implementatie is echter niet perfect, want er zitten nog steeds *Spooling* operators
+in, waarbij het opmerkelijk is dat er bijna 2500 rijen in een spool zitten, terwijl er uiteindelijk
+maar 23 worden gebruikt. Hier valt nog wat te optimaliseren dus.
+
 ## Welke coureurs hebben na deelname van een of meerdere seizoenen een periode niet deelgenomen en zijn in een later seizoen weer teruggekeerd in de Formule 1? Geef de naam van de coureur in alfabetische volgorde en daarnaast de periodes (in het format “1991–2006”, “2010–2012”) waarin ze deelgenomen hebben. Zet deze periodes op chronologische volgorde.
 
 ### Primaire Uitwerking
