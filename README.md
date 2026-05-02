@@ -1,3 +1,7 @@
+# Keuze database
+
+In dit project hebben wij ervoor gekozen om de HAN-database te gebruiken. Deze keuze is gemaakt omdat Luke een deel van het vak Advanced Databases al had afgerond en daardoor de nieuwe opdracht niet hoefde uit te voeren. Daarnaast ondervond hij vorig jaar problemen doordat zijn eigen uitwerking niet volledig aansloot bij de opdracht, waardoor bepaalde constraints en queries niet correct konden worden uitgewerkt. Door gebruik te maken van de standaard HAN-database worden deze risico’s vermeden.
+
 # Bevragingen
 
 ## Welke coureurs zijn in alle races van het seizoen 2024 ge-finished?
@@ -1043,7 +1047,7 @@ DECLARE
 202110;Silverstone;3;77;Valtteri Bottas;MERCEDES;17;+7.502s;1
 202119;Sao Paulo;1;77;Valtteri Bottas;MERCEDES;24;29:09.559;3
 202119;Sao Paulo;2;33;Max Verstappen;RED BULL RACING HONDA;24;+1.170s;2
-202119;Sao Paulo;3;55;Carlos Sainz;FERRARI;24;+18.723s;1';
+202119;Sao Paulo;3;55;Carlos Sainz;FERRARI;24;+18.723s;1'';
 
 -- Parse the CSV string into the temporary table.
 INSERT INTO #RaceResults
