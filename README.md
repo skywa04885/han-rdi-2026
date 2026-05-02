@@ -1403,13 +1403,13 @@ create index DriverStanding_RaceId_index
 go
 ```
 
-## Vergelijking van indexen
+## Vergelijking en samenvoeging van indexen
 
 Om te beginnen met het vergelijken van de aanbevolen indexen, is het belangrijk om inzicht
 te krijgen in welke aanbevelingen er zijn gemaakt. In deze sectie worden relevante aanbevelingen
 samengebracht, vergeleken en aangepast.
 
-### Index op RaceId in Result
+### Index op RaceId (en DriverId) in Result
 
 Een van de meest aanbevolen indexen was die op de `Result` tabel, en dan specifiek op 
 de `RaceId` kolom. Hieronder volgen alle aanbevolen indexen voor deze tabel en kolom.
@@ -1470,6 +1470,33 @@ create index Result_RaceId_index
     on dbo.Result (RaceId) include (DriverId, Laps)
 go
 ```
+
+Echter, is nog een andere index aanbevolen, deze is als volgt:
+
+```sql
+create index Result_RaceId_DriverId_index
+    on dbo.Result (RaceId, DriverId)
+go
+```
+
+Deze zou een lookup van resultaten op basis van zowel de `RaceId` als `DriverId` kolom versnellen. Het los aanmaken
+van deze index zorgt echter wel voor overlap met de hiervoor bepaalde index, wat niet verstandig is. Gelukkig heeft
+SQL-Server de *left-based prefix rule* wat eigenlijk inhoudt, dat een samengestelde index gebruikt kan worden, voor
+het raadplegen van een van de componenten, zolang je begint met de eerste kolommen van de index.
+
+In dit geval, zou er bij de eerste index op basis van de `RaceId` gezocht worden, hetzelfde zoeken zou dus ook werken
+bij de tweede index, want daar staat `RaceId` als eerste element, en kan dus doorzocht worden zonder `DriverId`. Hierdoor
+is het mogelijk om deze twee indexen samen te brengen, en minder opslag/ geheugen te gebruiken (omdat er geen duplicate
+index plaats hoeft te vinden). De samengebrachte index is dan ook als volgt.
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId, DriverId) include (Laps)
+go
+```
+
+De `DriverId` kan dan ook uit de include worden gehaald, omdat deze al direct in de index beschikbaar is. Hiermee hebben
+we dus eigenlijk twee vliegen in een klap, en twee indexen samengebracht zonder dat er extra resources gebruikt moeten worden.
 
 ### Index op RaceId van DriverStanding
 
