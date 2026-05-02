@@ -1,0 +1,62 @@
+name: Publish PDF
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - README.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare output folder
+        run: mkdir -p public
+
+      - name: Render README.md to PDF
+        uses: docker://pandoc/latex:3.8
+        with:
+          args: >
+            README.md
+            -f gfm
+            -o public/index.pdf
+
+      - name: Create redirect index.html
+        run: |
+          cat << 'EOF' > public/index.html
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta http-equiv="refresh" content="0; url=index.pdf">
+              <title>Redirecting...</title>
+            </head>
+            <body>
+              <p>If you are not redirected, <a href="index.pdf">click here</a>.</p>
+            </body>
+          </html>
+          EOF
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
