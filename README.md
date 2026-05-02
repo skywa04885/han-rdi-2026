@@ -350,6 +350,31 @@ create index Result_RaceId_FastestLapTime_index
 go
 ```
 
+### Vergelijking
+
+Een van de eerste dingen die op opvalt in de queryplannen is dat deze keer de primaire implementatie gebruikt
+maakt van spooling. In de eerste bevraging was spooling ook behandeld, maar daarbij was het aantal gelezen
+rijen niet heel significant, ook al was het wel iets waar op gelet moest worden. Deze query heeft echter wel
+een enorm groot aantal rijen, namelijk bijna 9000. Dit kan erg veel geheugen kosten, en veel IO als het op
+de disk opgeslagen wordt. Dit is dus al eigenlijk iets dat wij niet willen zien.
+
+Verder wordt er in de primaire implementatie veel gebruik gemaakt van *Nested Loops*, die ieder best een
+grote cost hebben. De alternatieve implementatie maakt in contrast gebruik van normale *Hash Joins*, die veel
+lagere kosten hebben, en ook beter zijn voor de performance in grote aantallen. De *Merge Join* van de
+primaire implementatie is daarintegen niet zorgwekkend, deze operation wordt direct gebaseerd op de inhoud
+van de clustered index, die al gesorteerd is, waardoor geen dure sort-operation nodig is.
+
+Een ander iets dat opvalt is dat de primaire implementatie meer *Full Index Scan* operators gebruikt
+dan de alternatieve implementatie, waarbij zowel de Race als Result tabellen twee keer worden raadgepleegd.
+De alternatieve implementatie doet dit minder, met enkel de Race die twee keer wordt raadgepleegd.
+
+### Voorkeur
+
+De voorkeur van ons is zoals te verwachten, voor de alternatieve implementatie. Deze maakt gebruik van snelle
+en goedkope *Hash Join* operators, raadpleegt indexen minder vaak (minder IO) en heeft geen *Spooling* operators. Daarnaast is het queryplan van de alternatieve implementatie veel simpeler, en is de cost/
+executietijd lager. Kijkend naar de code-style, is hierbij niet echt een voorkeur te benoemen, beide queries
+zijn van vergelijkbare leesbaarheid en complexiteit.
+
 ## Toon voor de seizoenen 2015 tot en met 2024 de winnaar van het seizoen. Geef het jaartal van het seizoen, de naam van de winnaar, het aantal races dat hij heeft gewonnen. Voeg ook het totaal aantal races toe, en voeg tot slot het volgende toe: vanaf welke race (datum, volgnummer in het seizoen + naam van de race) stond hij in de klassering op de eerste plaats en behield hij die eerste plek tot het einde toe.
 
 ### Primaire Uitwerking
