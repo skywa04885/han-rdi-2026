@@ -1409,7 +1409,7 @@ Om te beginnen met het vergelijken van de aanbevolen indexen, is het belangrijk 
 te krijgen in welke aanbevelingen er zijn gemaakt. In deze sectie worden relevante aanbevelingen
 samengebracht, vergeleken en aangepast.
 
-### Index op RaceId (en DriverId) in Result
+### Index op `RaceId` (en `DriverId`) in `Result`
 
 Een van de meest aanbevolen indexen was die op de `Result` tabel, en dan specifiek op 
 de `RaceId` kolom. Hieronder volgen alle aanbevolen indexen voor deze tabel en kolom.
@@ -1498,7 +1498,7 @@ go
 De `DriverId` kan dan ook uit de include worden gehaald, omdat deze al direct in de index beschikbaar is. Hiermee hebben
 we dus eigenlijk twee vliegen in een klap, en twee indexen samengebracht zonder dat er extra resources gebruikt moeten worden.
 
-### Index op RaceId van DriverStanding
+### Index op `RaceId` van `DriverStanding`
 
 Voor de `DriverStanding` tabel heeft de SQL-Server/IDE de volgende twee indexen aanbevolen.
 
@@ -1531,3 +1531,16 @@ dan voorkomen dat er een key-lookup plaats hoeft te vinden, per iteratie. In dit
 bevragingen waaruit deze aanbeveling kwam, gebruik maken van *Nested Loop* operators. Hierdoor is deze index
 wel een serieuze kandidaat, die voor flinke speedup kan zorgen. Daarom kiezen wij om deze aanbevolen kolommen
 te behouden.
+
+### Index op `FastestLapTime` van `Result`
+
+create index Result_FastestLapTime_index
+    on dbo.Result (FastestLapTime) include (RaceId, DriverId, PositionText, 
+        Points, Laps, FastestLap, ResultStatusId)
+go
+
+create index Result_RaceId_FastestLapTime_index
+    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText, 
+        Points, Laps, FastestLap, ResultStatusId)
+go
+

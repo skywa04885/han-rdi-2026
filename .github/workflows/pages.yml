@@ -3,8 +3,6 @@ name: Publish PDF
 on:
   push:
     branches: ["master"]
-    paths:
-      - README.md
   workflow_dispatch:
 
 permissions:
