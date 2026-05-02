@@ -578,39 +578,21 @@ Er zijn geen indexen voorgesteld door de database management tool voor deze quer
 
 ### Vergelijking
 
-Deze vergelijking zal voor ons vooral gaan over onderhoudbaarheid. Zoals eerder zichtbaar in de queryplannen, is het
-queryplan van de primaire query zo groot dat deze niet eens met de standaard diagram tool opgeslagen kon worden,
-en daarom omgezet moest worden naar een Draw.IO diagram. Dit omdat deze query abnormaal veel operators heeft om
-tot een resultaat te komen, voor onderhoud, is dit een heel slecht iets, indien er in de toekomst aanpassingen
-gemaakt moeten worden, of optimalisaties, is het queryplan gewoon te uitgebreid en overweldigend.
+Deze vergelijking richt zich voornamelijk op de onderhoudbaarheid en performance van de queryplannen. Zoals eerder zichtbaar in de queryplannen, is het plan van de primaire implementatie dermate groot dat het niet met de standaard diagramtool opgeslagen kon worden en daarom moest worden omgezet naar een Draw.io-diagram. Dit illustreert de hoge complexiteit van de query, die een groot aantal operators bevat om tot een resultaat te komen. Vanuit onderhoudsperspectief is dit onwenselijk: toekomstige aanpassingen of optimalisaties worden hierdoor complex en foutgevoelig.
 
-Zowel de primaire als alternatieve implementatie maken gebruik van *Spooling*, de primaire echter wel veel meer dan 
-de alternatieve implementatie. Ook worden dezelfde indexen, tabellen in de primaire implementatie heel erg veel
-dubbel gebruikt en gelezen, dit zorgt voor veel meer IO operaties dan de alternatieve implementatie; die het nog steeds dubbel doet, maar magnitudes minder.
+Zowel de primaire als de alternatieve implementatie maken gebruik van spooling. De primaire implementatie doet dit echter aanzienlijk vaker. Daarnaast worden in de primaire implementatie dezelfde tabellen en indexen herhaaldelijk gelezen, wat leidt tot een toename in het aantal I/O-operaties. De alternatieve implementatie vertoont dit gedrag ook, maar in aanzienlijk mindere mate.
 
-Verder worden er veel meer *Sort* operators gebruikt in de primarie implementatie, sorteren is duur, en moet eingelijk
-zo veel mogelijk voorkomen worden, indien volgorde nodig is, zou dit eigenlijk uit indexen moeten komen. Het feit
-dat de primaire veel meer sorteert, maakt deze in veregelijking tot de alternatieve, dus ook veel minder goed.
+Verder valt op dat de primaire implementatie meer gebruikmaakt van Sort-operators. Sorteren is een relatief dure operatie en dient bij voorkeur beperkt te worden, bijvoorbeeld door gebruik te maken van geschikte indexen die de gewenste volgorde al leveren. Het frequente gebruik van sorteeroperaties maakt de primaire implementatie daardoor minder efficiënt dan de alternatieve variant.
 
-Een van de andere dingen die erg opvalt, is dat de primaire implementatie nog werkt met extreem grote
-datasets, zelfs al is dit hogerop in de operator tree, hierbij wordt er dus ook veel filtering pas in
-latere stadia toegepast. De alternatieve implementatie lijkt in redelijk vroege stadia de dataset
-al erg compact te krijgen, en voert geen filtering tussendoor. Dit mede omdat de *Join* operators in
-vroege stadia de dataset al enorm verkleinen. 
+Een ander belangrijk verschil is zichtbaar in de manier waarop met datasets wordt omgegaan. In de primaire implementatie wordt lange tijd gewerkt met relatief grote datasets, waarbij filtering pas in latere stadia van het queryplan plaatsvindt. Dit resulteert in grotere tussenresultaten en dus hogere kosten voor vervolgoperaties. De alternatieve implementatie daarentegen reduceert de dataset al in een vroeg stadium, met name door efficiëntere join-operaties. Hierdoor worden latere stappen uitgevoerd op een aanzienlijk kleinere dataset, wat de performance ten goede komt.
 
-Qua stijl, heeft de alternatieve implementatie ook onze voorkeur, deze is veel compacter en
-makkelijker te lezen/ onderhouden, omdat deze minder complex is. Hierbij is ook direct zichtbaar
-dat een minder complexe query, ook tot een simpeler queryplan kan leiden.
+Tot slot scoort de alternatieve implementatie beter op het gebied van leesbaarheid en onderhoudbaarheid. De query is compacter en minder complex, wat zich direct vertaalt naar een overzichtelijker queryplan. Dit bevestigt dat een minder complexe query doorgaans leidt tot een efficiënter en beter te onderhouden uitvoeringsplan.
 
 ### Voorkeur
 
-Onze voorkeur gaat daarom ook uit voor de alternatieve implementatie, niet alleen is deze simpeler
-om mee te werken, wegens zowel de query zelf, als het compacte queryplan. Ook is deze veel
-efficienter en maakt de dataset waarop gewerkt wordt al erg vroeg compact.
+De voorkeur gaat daarom uit naar de alternatieve implementatie. Deze is niet alleen eenvoudiger te begrijpen en te onderhouden, maar ook efficiënter in uitvoering. De dataset wordt in een vroeg stadium gereduceerd en er wordt minder gebruikgemaakt van kostbare operaties zoals spooling en sorteren.
 
-Deze primaire implementatie is echter niet perfect, want er zitten nog steeds *Spooling* operators
-in, waarbij het opmerkelijk is dat er bijna 2500 rijen in een spool zitten, terwijl er uiteindelijk
-maar 23 worden gebruikt. Hier valt nog wat te optimaliseren dus.
+De alternatieve implementatie is echter nog niet volledig geoptimaliseerd. Zo bevat het queryplan nog steeds spool-operators waarbij bijvoorbeeld circa 2500 rijen worden opgeslagen, terwijl uiteindelijk slechts 23 rijen worden gebruikt. Dit wijst op verdere optimalisatiemogelijkheden, met name in het beperken van overbodige tussenresultaten.
 
 ## Welke coureurs hebben na deelname van een of meerdere seizoenen een periode niet deelgenomen en zijn in een later seizoen weer teruggekeerd in de Formule 1? Geef de naam van de coureur in alfabetische volgorde en daarnaast de periodes (in het format “1991–2006”, “2010–2012”) waarin ze deelgenomen hebben. Zet deze periodes op chronologische volgorde.
 
