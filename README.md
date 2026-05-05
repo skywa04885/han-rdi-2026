@@ -1534,13 +1534,92 @@ te behouden.
 
 ### Index op `FastestLapTime` van `Result`
 
+Een van de laatste aanbevolen indexen gaat over de kolom `FastestLapTime` in de tabel `Result`.
+
+```sql
 create index Result_FastestLapTime_index
     on dbo.Result (FastestLapTime) include (RaceId, DriverId, PositionText, 
         Points, Laps, FastestLap, ResultStatusId)
 go
+```
 
+Wat hier vooral opvalt is hoeveel kolommen er in de `INCLUDE` zitten. De index wordt daardoor vrij breed en lijkt bijna 
+op een extra kopie van de tabel, met `FastestLapTime` als sleutel. Dat kan prima werken, maar het geeft wel aan dat de 
+query na het filteren nog veel kolommen nodig heeft.
+
+In de queryplannen zie je dat er opnieuw nested loops gebruikt worden. In zo’n geval helpt deze index wel, omdat je een 
+hoop key lookups voorkomt. Het plan wordt dus goedkoper, maar je bent eigenlijk vooral aan het optimaliseren rondom die 
+nested loops in plaats van het onderliggende probleem op te lossen.
+
+Het is daarom zinvoller om te kijken waarom de optimizer überhaupt voor nested loops kiest. Dat kan liggen aan de query zelf, 
+maar ook aan de statistics. In meerdere plannen is te zien dat de estimated en actual rows niet goed overeenkomen, en dat is 
+vaak een teken dat de optimizer op basis van verkeerde aannames werkt.
+
+### Index op `RaceId` en `FastestLapTime` van `Result`
+
+```sql
 create index Result_RaceId_FastestLapTime_index
     on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText, 
         Points, Laps, FastestLap, ResultStatusId)
 go
+```
 
+Deze index voelt een stuk logischer. Door `RaceId` als eerste kolom te gebruiken, sluit hij beter aan op hoe de data 
+meestal benaderd wordt: eerst een specifieke race, en daarna de rondetijden binnen die race. De combinatie met `FastestLapTime` 
+maakt de index ook selectiever dan wanneer je alleen op die kolom indexeert.
+
+De index is nog steeds breed door de `INCLUDE`, dus hij zal meer ruimte innemen en duurder zijn bij writes. Daar staat tegenover 
+dat hij waarschijnlijk wel de benodigde queries volledig kan afdekken, waardoor extra lookups niet nodig zijn.
+
+Als je moet kiezen, is deze variant met `(RaceId, FastestLapTime)` de meest logische. Tegelijk blijft het belangrijk om 
+niet alleen naar de index te kijken, maar ook naar de oorzaak van het gekozen queryplan, zeker omdat de afwijking tussen 
+estimated en actual rows erop wijst dat de optimizer niet altijd de juiste keuzes maakt.
+
+## Selectie en toepassen van indexen
+
+Nu alle aanbevolen indexen onder de loep zijn genomen, wordt er een selectie gemaakt van in totaal drie indexen. 
+Hierbij is gekeken naar hoe breed inzetbaar ze zijn en of ze niet te veel overlap met elkaar hebben. 
+De gekozen indexen zijn als volgt.
+
+### Index op `RaceId` (en `DriverId`) in `Result`
+
+```sql
+create index Result_RaceId_index
+    on dbo.Result (RaceId, DriverId) include (Laps)
+```
+
+Deze index is gekozen omdat veel queries beginnen met het filteren op `RaceId`. Door `DriverId` mee te nemen in de sleutel kan er ook 
+efficiënt gezocht worden op combinaties van race en coureur. De `Laps` kolom is toegevoegd als include omdat deze vaak nodig is in de 
+select, waardoor extra lookups vermeden worden. Tegelijk blijft de index relatief compact en breed inzetbaar.
+
+### Index op `RaceId` van `DriverStanding`
+
+```sql
+create index DriverStanding_RaceId_index
+    on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
+```
+
+Deze index sluit direct aan op queries die standings per race ophalen. Omdat in die queries vrijwel altijd ook `DriverId`, `Points` 
+en `Position` nodig zijn, zorgt deze index ervoor dat de benodigde data direct beschikbaar is. Dit voorkomt herhaaldelijke key 
+lookups, wat vooral bij *nested loops* een merkbaar verschil maakt in performance.
+
+### Index op `RaceId` en `FastestLapTime` van `Result`
+
+```sql
+create index Result_RaceId_FastestLapTime_index
+    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText, 
+        Points, Laps, FastestLap, ResultStatusId)
+```
+
+Deze index is gekozen omdat hij beter aansluit op het gebruikspatroon van de queries dan een index op alleen `FastestLapTime`. 
+In de praktijk wordt eerst op een race gefilterd en daarna pas gekeken naar rondetijden. Door deze volgorde in de index aan te 
+houden, wordt de selectiviteit beter en kan de optimizer efficiënter werken. De extra kolommen zorgen ervoor dat de meeste 
+queries volledig uit de index gehaald kunnen worden, zonder extra lookups.
+
+## Effectiviteit van indexen
+
+### Index op `RaceId` (en `DriverId`) in `Result`
+
+### Index op `RaceId` van `DriverStanding`
+
+### Index op `RaceId` en `FastestLapTime` van `Result`
