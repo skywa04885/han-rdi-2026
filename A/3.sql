@@ -112,3 +112,64 @@ FROM SeasonWinner
                                           AND Race2.NrOfRound > Race.NrOfRound)
                       ORDER BY Race.NrOfRound) AS FirstUnbrokenP1
 ORDER BY SeasonWinner.RaceYear;
+
+-- Option 3
+WITH SeasonWinner
+         AS (SELECT Race.RaceYear
+                  , DriverStanding.DriverId
+                  , CONCAT_WS(' ', Driver.Firstname, Driver.Lastname) AS DriverName
+             FROM DriverStanding
+                      INNER JOIN Race ON Race.RaceId = DriverStanding.RaceId
+                      INNER JOIN Driver ON Driver.DriverId = DriverStanding.DriverId
+             WHERE DriverStanding.Position = 1
+               AND Race.RaceYear BETWEEN 2015 AND 2024
+               AND Race.NrOfRound =
+                   (SELECT MAX(Race2.NrOfRound) FROM Race Race2 WHERE Race2.RaceYear = Race.RaceYear)),
+     ChampStandings
+         AS (SELECT Race.RaceYear
+                  , Race.RaceDate
+                  , Race.NrOfRound
+                  , Race.RaceName
+                  , DriverStanding.Position                                                AS StandPos
+                  , ROW_NUMBER() OVER (PARTITION BY Race.RaceYear ORDER BY Race.NrOfRound) AS Seq
+                  , COUNT(*) OVER (PARTITION BY Race.RaceYear)                             AS TotalRaces
+             FROM DriverStanding
+                      INNER JOIN Race ON Race.RaceId = DriverStanding.RaceId
+                      INNER JOIN SeasonWinner ON SeasonWinner.DriverId = DriverStanding.DriverId
+                          AND SeasonWinner.RaceYear = Race.RaceYear),
+     LastNonP1
+         AS (SELECT RaceYear
+                  , ISNULL(MAX(Seq), 0) AS LastNonP1Seq
+             FROM ChampStandings
+             WHERE StandPos > 1
+             GROUP BY RaceYear),
+     FirstUnbrokenP1
+         AS (SELECT ChampStandings.RaceYear
+                  , MIN(ChampStandings.Seq) AS FirstSeq
+             FROM ChampStandings
+                      INNER JOIN LastNonP1 ON LastNonP1.RaceYear = ChampStandings.RaceYear
+             WHERE ChampStandings.Seq > LastNonP1.LastNonP1Seq
+             GROUP BY ChampStandings.RaceYear),
+     ChampWins
+         AS (SELECT Race.RaceYear
+                  , COUNT(*) AS RaceWins
+             FROM Result
+                      INNER JOIN Race ON Race.RaceId = Result.RaceId
+                      INNER JOIN SeasonWinner
+                                 ON SeasonWinner.DriverId = Result.DriverId
+                                     AND SeasonWinner.RaceYear = Race.RaceYear
+             WHERE Result.Position = 1
+             GROUP BY Race.RaceYear)
+SELECT SeasonWinner.RaceYear     AS Seizoen
+     , SeasonWinner.DriverName   AS Kampioen
+     , ChampWins.RaceWins        AS RaceWins
+     , ChampStandings.TotalRaces AS TotaalRaces
+     , ChampStandings.RaceDate   AS LeiderVanaf
+     , ChampStandings.NrOfRound  AS Volgnummer
+     , ChampStandings.RaceName   AS Race
+FROM SeasonWinner
+         JOIN ChampWins ON ChampWins.RaceYear = SeasonWinner.RaceYear
+         JOIN FirstUnbrokenP1 ON FirstUnbrokenP1.RaceYear = SeasonWinner.RaceYear
+         JOIN ChampStandings ON ChampStandings.RaceYear = SeasonWinner.RaceYear
+             AND ChampStandings.Seq = FirstUnbrokenP1.FirstSeq
+ORDER BY SeasonWinner.RaceYear;

@@ -63,3 +63,29 @@ FROM RankedResults rr
                     ON rs.ResultStatusId = rr.ResultStatusId
 WHERE rr.rn = 1
 ORDER BY CircuitName, FastestLapTime;
+
+-- Option 3
+WITH FastestPerRace
+         AS (SELECT Result.RaceId             AS RaceId
+                  , MIN(Result.FastestLapTime) AS MinTime
+             FROM Result
+             WHERE Result.FastestLapTime IS NOT NULL
+             GROUP BY Result.RaceId)
+SELECT Circuit.CircuitName                               AS CircuitName
+     , Race.RaceDate                                     AS RaceDate
+     , CONCAT_WS(' ', Driver.Firstname, Driver.Lastname) AS Name
+     , Result.FastestLap                                 AS FastestLap
+     , Result.FastestLapTime                             AS FastestLapTime
+     , Result.PositionText                               AS Position
+     , Result.Points                                     AS Points
+     , Result.Laps                                       AS Laps
+     , ResultStatus.ResultStatus                         AS ResultStatus
+FROM FastestPerRace
+         INNER JOIN Result ON Result.RaceId = FastestPerRace.RaceId
+             AND Result.FastestLapTime = FastestPerRace.MinTime
+         INNER JOIN Race ON Race.RaceId = FastestPerRace.RaceId
+         INNER JOIN Driver ON Driver.DriverId = Result.DriverId
+         INNER JOIN Circuit ON Circuit.CircuitId = Race.CircuitId
+         INNER JOIN ResultStatus ON ResultStatus.ResultStatusId = Result.ResultStatusId
+WHERE Race.RaceYear BETWEEN 2004 AND 2024
+ORDER BY CircuitName, FastestLapTime;
