@@ -193,3 +193,28 @@ WHERE Race.RaceYear = 2021
                      WHERE RaceYear = 2021
                      ORDER BY RaceDate DESC)
 ORDER BY DriverStanding.Position;
+
+-- Optie 3
+WITH LastRace AS (
+    SELECT TOP 1 RaceId
+    FROM Race
+    WHERE RaceYear = 2021
+    ORDER BY RaceDate DESC
+)
+SELECT DriverStanding.Position                                       AS POS
+     , Driver.Firstname + ' ' + Driver.Lastname                      AS DRIVER
+     , Driver.Nationality                                            AS NATIONALITY
+     , (SELECT TOP 1 Constructor.ContstructorName
+        FROM Result
+                 INNER JOIN Constructor ON Constructor.ConstructorId = Result.ConstructorId
+        WHERE Result.DriverId = Driver.DriverId
+          AND Result.RaceId = LastRace.RaceId
+        ORDER BY Result.ResultId DESC)                               AS CAR
+     , DriverStanding.Points                                         AS PTS
+FROM DriverStanding
+         INNER JOIN Driver ON DriverStanding.DriverId = Driver.DriverId
+         INNER JOIN Race ON DriverStanding.RaceId = Race.RaceId
+         CROSS JOIN LastRace
+WHERE Race.RaceYear = 2021
+  AND Race.RaceId = LastRace.RaceId
+ORDER BY DriverStanding.Position;

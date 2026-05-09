@@ -41,3 +41,17 @@ FROM Driver
 -- Join the merged ranges.
          INNER JOIN DriverYearRanges ON DriverYearRanges.DriverId = Driver.DriverId
 WHERE Result.Wins >= 25;
+
+-- Option 3
+SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                                   AS Driver
+     , DriverYearRanges.Ranges                                                             AS Seasons
+     , COUNT(*)                                                                            AS Entries
+     , SUM(CASE WHEN Result.Position = 1 THEN 1 ELSE 0 END)                                AS Wins
+     , CONCAT(ROUND(CAST(SUM(CASE WHEN Result.Position = 1 THEN 1 ELSE 0 END) AS FLOAT)
+                    / COUNT(*) * 100, 2), '%')                                             AS Percentage
+FROM Driver
+         INNER JOIN Result ON Result.DriverId = Driver.DriverId
+         LEFT JOIN DriverYearRanges ON DriverYearRanges.DriverId = Driver.DriverId
+GROUP BY Driver.DriverId, Driver.Firstname, Driver.Lastname, DriverYearRanges.Ranges
+HAVING SUM(CASE WHEN Result.Position = 1 THEN 1 ELSE 0 END) >= 25
+ORDER BY Wins DESC;

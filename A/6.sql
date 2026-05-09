@@ -37,3 +37,22 @@ FROM Result
          INNER JOIN Driver ON Driver.DriverId = Result.DriverId
 GROUP BY Driver.DriverId, Driver.Firstname, Driver.Lastname, Race.RaceYear
 ORDER BY SUM(IIF(Result.Position = 1, 1, 0)) * 1.0 / COUNT(1) DESC;
+
+-- Option 3
+SELECT CONCAT_WS(' ', d.Firstname, d.Lastname)                          AS Driver
+     , dr.RaceYear                                                      AS Season
+     , ss.Races                                                         AS Races
+     , ss.Wins                                                          AS Wins
+     , CONCAT(CAST(ROUND(100.0 * ss.Wins / NULLIF(ss.Races, 0), 2)
+                  AS DECIMAL(10, 2)), '%')                              AS Percentage
+FROM (SELECT DISTINCT Result.DriverId, Race.RaceYear
+      FROM Result
+               INNER JOIN Race ON Race.RaceId = Result.RaceId) dr
+         CROSS APPLY (SELECT COUNT(*)                                                AS Races
+                           , SUM(CASE WHEN res.Position = 1 THEN 1 ELSE 0 END)       AS Wins
+                      FROM Result res
+                               INNER JOIN Race r ON r.RaceId = res.RaceId
+                      WHERE res.DriverId = dr.DriverId
+                        AND r.RaceYear = dr.RaceYear) ss
+         INNER JOIN Driver d ON d.DriverId = dr.DriverId
+ORDER BY ss.Wins * 1.0 / ss.Races DESC;

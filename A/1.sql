@@ -71,3 +71,23 @@ FROM DriverCompletion
          INNER JOIN Driver ON Driver.DriverId = DriverCompletion.DriverId
 WHERE DriverCompletion.MinCompletion >= 0.9
 ORDER BY DriverCompletion.MinCompletion DESC;
+
+------------------------------------------------------------------------------------------------------------------------
+-- Option 3
+------------------------------------------------------------------------------------------------------------------------
+
+SELECT CONCAT_WS(' ', d.Firstname, d.Lastname)                         AS Name
+     , CONCAT(CAST(ROUND(MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps), 2) * 100 AS VARCHAR), '%') AS Completion
+FROM Result r
+         INNER JOIN Race ON Race.RaceId = r.RaceId
+         INNER JOIN (SELECT Result.RaceId      AS RaceId
+                          , MAX(Result.Laps) AS MaxLaps
+                     FROM Result
+                              INNER JOIN Race ON Race.RaceId = Result.RaceId
+                     WHERE Race.RaceYear = 2024
+                     GROUP BY Result.RaceId) rml ON rml.RaceId = r.RaceId
+         INNER JOIN Driver d ON d.DriverId = r.DriverId
+WHERE Race.RaceYear = 2024
+GROUP BY d.DriverId, d.Firstname, d.Lastname
+HAVING MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps) >= 0.9
+ORDER BY MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps) DESC;
