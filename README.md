@@ -853,6 +853,23 @@ techniek: de tellingen worden niet vooraf in aparte CTE’s gegroepeerd, maar pe
 
 Er zijn geen indexen voorgesteld door de database management tool voor deze query.
 
+### Vergelijking
+
+Het eerste dat opvalt is dat een groot deel van de executieplannen overeenkomt, wat logisch is omdat beide implementaties gebruikmaken van dezelfde view. De vergelijking richt zich daarom voornamelijk op het afwijkende segment, dat in beide plannen bovenaan het diagram zichtbaar is.
+
+Het grootste verschil is dat de alternatieve implementatie wederom veel gebruikmaakt van spooling in combinatie met nested loops. De primaire implementatie maakt ook gebruik van nested loops, maar zonder spooling. In beide gevallen zijn de nested loops een aandachtspunt. Bij de primaire implementatie ontbreekt spooling, wat op het eerste gezicht positief lijkt, maar worden er tienduizenden iteraties uitgevoerd, mogelijk met herhaalde lookups. De alternatieve implementatie sloopt tussenresultaten op in geheugen of op disk, wat ook nadelig kan zijn bij grotere aantallen rijen.
+
+Opvallend is dat de primaire implementatie ervoor heeft gekozen geen spooling toe te passen, vermoedelijk omdat SQL Server meer rijen verwerkte dan verwacht. Bij de alternatieve implementatie komt de schatting beter overeen met het daadwerkelijke aantal gelezen rijen, wat de keuze voor spooling verklaart. De oorzaak ligt mogelijk bij onnauwkeurige statistieken, waardoor SQL Server geen goed onderbouwde beslissing kon nemen bij de primaire variant.
+
+Tot slot is het queryplan van de primaire implementatie compacter en bevat het minder stappen. De gemaakte beslissingen zijn echter suboptimaal, wat leidt tot inefficiënt gebruik van de beschikbare data.
+
+### Voorkeur
+
+Onze voorkeur gaat uit naar de alternatieve implementatie, al is deze keuze niet zonder voorbehoud. Indien performance de prioriteit is, biedt de spooling in de alternatieve variant voordelen. Wanneer geheugen- en I/O-gebruik leidend zijn, zou de primaire implementatie de voorkeur verdienen, omdat deze geen potentiële disk- of geheugenspooling kent, al gaat dat ten koste van meer iteraties en bijbehorende I/O.
+
+De primaire implementatie heeft een overzichtelijker queryplan; de alternatieve heeft beter leesbare code. Doorslaggevend is echter dat de alternatieve implementatie een betere overeenkomst toont tussen geschatte en daadwerkelijke rijen, waardoor SQL Server beter onderbouwde beslissingen kan nemen omtrent query-uitvoering. Om die reden heeft de alternatieve implementatie onze voorkeur.
+
+
 ## Er zijn niet ieder jaar evenveel wedstrijden gereden. Daarom is het interessant om te zien welke coureur procentueel de meeste races per seizoen heeft gewonnen. Maak onderstaand overzicht
 
 ### Primaire Uitwerking
