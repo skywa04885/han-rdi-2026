@@ -1017,7 +1017,7 @@ go
 
 ### Vergelijking
 
-Het meest opvallende verschil tussen de twee queryplannen is de manier waarop de aggregatie wordt uitgevoerd. De primaire implementatie verdeelt het werk over twee afzonderlijke aggregatiepaden, elk met een eigen Hash Match Aggregate, die vervolgens worden samengevoegd via een Right Outer Join. Dit betekent dat zowel de Result- als de Race-tabel twee keer worden gescand: 1 keer voor DriverWins en 1 keer voor DriverRaces. De alternatieve implementatie voert alle aggregaties in één stap uit via een Stream Aggregate, waarbij elke tabel slechts één keer wordt gescand.
+Het meest opvallende verschil tussen de twee queryplannen is de manier waarop de aggregatie wordt uitgevoerd. De primaire implementatie verdeelt het werk over twee afzonderlijke aggregatiepaden, elk met een eigen Hash Match Aggregate, die vervolgens worden samengevoegd via een Right Outer Join. Dit betekent dat zowel de Result- als de Race-tabel twee keer worden gescand: 1 keer voor DriverWins en 1 keer voor DriverRaces. De alternatieve implementatie voert alle aggregaties in één stap uit via een Stream Aggregate, waarbij elke tabel slechts 1 keer wordt gescand.
 
 Een ander verschil is het type join dat wordt gebruikt om de twee deelresultaten samen te voegen. De primaire implementatie vereist een Right Outer Join om de gevallen af te handelen waarin een coureur geen overwinningen heeft in een bepaald seizoen. De alternatieve implementatie heeft deze extra join niet nodig, omdat wins en races direct in dezelfde aggregatiestap worden berekend en een ontbrekende overwinning simpelweg als nul uitkomt via `SUM(IIF(...))`.
 
@@ -1343,6 +1343,18 @@ create index DriverStanding_RaceId_index
     on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
 go
 ```
+
+### Vergelijking
+
+Het meest opvallende verschil tussen de twee queryplannen is de manier waarop de constructor wordt opgezocht. De primaire implementatie koppelt de `Result`-tabel via een *Hash Join*, waarvoor eerst een *Full Index Scan* over ongeveer 26 duizend rijen wordt uitgevoerd. De alternatieve implementatie doet dit via een `CROSS APPLY` met een *Lazy Spool* en een Transformation (Top), wat overeenkomt met de TOP 1 in de subquery. Hierdoor wordt per coureur slechts 1 rij uit Result opgehaald in plaats van de volledige tabel te scannen.
+
+Ook de bepaling van de laatste race verloopt anders. De primaire implementatie gebruikt een Stream Aggregate met een *Transformation (Top)* om het hoogste RaceId te vinden. De alternatieve implementatie gebruikt een *TopN* Sort op de `Race`-tabel, passend bij de `ORDER BY RaceDate DESC` aanpak. Beide leiden tot 1 rij, maar via een ander pad.
+
+Tot slot bevat de primaire implementatie een expliciete *Sort*-operator voor de *Hash Join* op `Result`. In de alternatieve implementatie ontbreekt deze, maar verschijnt een *Lazy Spool* die tussenresultaten buffert voor hergebruik in de nested loops.
+
+### Voorkeur
+
+De voorkeur gaat uit naar de alternatieve implementatie. Het belangrijkste bezwaar tegen de primaire variant is de *Full Index Scan* over de volledige Result-tabel, die de alternatieve implementatie met de `TOP 1 CROSS APPLY` weet te vermijden. Daarnaast is het gebruik van `ORDER BY RaceDate DESC` om de laatste race te bepalen robuuster dan `MAX(RaceId)`, omdat een RaceId niet gegarandeerd chronologisch oploopt. De alternatieve implementatie maakt daarmee beter onderbouwde aannames over de data, wat zich ook vertaalt in een lagere totale query cost.
 
 # Indexeren (D)
 
