@@ -1015,6 +1015,18 @@ create index Result_RaceId_index
 go
 ```
 
+### Vergelijking
+
+Het meest opvallende verschil tussen de twee queryplannen is de manier waarop de aggregatie wordt uitgevoerd. De primaire implementatie verdeelt het werk over twee afzonderlijke aggregatiepaden, elk met een eigen Hash Match Aggregate, die vervolgens worden samengevoegd via een Right Outer Join. Dit betekent dat zowel de Result- als de Race-tabel twee keer worden gescand: 1 keer voor DriverWins en 1 keer voor DriverRaces. De alternatieve implementatie voert alle aggregaties in één stap uit via een Stream Aggregate, waarbij elke tabel slechts één keer wordt gescand.
+
+Een ander verschil is het type join dat wordt gebruikt om de twee deelresultaten samen te voegen. De primaire implementatie vereist een Right Outer Join om de gevallen af te handelen waarin een coureur geen overwinningen heeft in een bepaald seizoen. De alternatieve implementatie heeft deze extra join niet nodig, omdat wins en races direct in dezelfde aggregatiestap worden berekend en een ontbrekende overwinning simpelweg als nul uitkomt via `SUM(IIF(...))`.
+
+Het queryplan van de alternatieve implementatie is daarmee lineairder en bevat minder operators. De primaire implementatie heeft een complexer plan met meer vertakkingen, al is de code door de benoemde CTEs wel explicieter leesbaar.
+
+### Voorkeur
+
+Onze voorkeur gaat uit naar de alternatieve implementatie. Het queryplan is eenvoudiger van opzet: minder operators, geen dubbele index scans en geen extra join om twee onafhankelijke deelresultaten samen te voegen. Doorslaggevend is daarnaast dat de alternatieve implementatie inherent minder foutgevoelig is: omdat wins en races uit exact dezelfde rijen worden berekend, kan er geen mismatch ontstaan die bij de CTE-aanpak theoretisch mogelijk is bij een onjuiste join-conditie. De compactere code sluit hier goed op aan en maakt de implementatie eenvoudiger te onderhouden.
+
 ## Maak de eindstand voor de coureurs van 2021 na. Zie onderstaand overzicht voor de juiste punten.
 
 ### Invoegen extra gegevens
