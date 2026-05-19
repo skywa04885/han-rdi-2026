@@ -156,6 +156,48 @@ create index Result_RaceId_index
 go
 ```
 
+### Alternatieve Uitwerking 2
+
+#### Query
+
+```sql
+SELECT CONCAT_WS(' ', d.Firstname, d.Lastname)                         AS Name
+     , CONCAT(CAST(ROUND(MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps), 2) * 100 AS VARCHAR), '%') AS Completion
+FROM Result r
+         INNER JOIN Race ON Race.RaceId = r.RaceId
+         INNER JOIN (SELECT Result.RaceId      AS RaceId
+                          , MAX(Result.Laps) AS MaxLaps
+                     FROM Result
+                              INNER JOIN Race ON Race.RaceId = Result.RaceId
+                     WHERE Race.RaceYear = 2024
+                     GROUP BY Result.RaceId) rml ON rml.RaceId = r.RaceId
+         INNER JOIN Driver d ON d.DriverId = r.DriverId
+WHERE Race.RaceYear = 2024
+GROUP BY d.DriverId, d.Firstname, d.Lastname
+HAVING MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps) >= 0.9
+ORDER BY MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps) DESC;
+```
+
+#### Resultaten
+
+| Name           | Completion |
+|----------------|------------|
+| Oscar Piastri  | 100%       |
+| Oliver Bearman | 100%       |
+| Jack Doohan    | 98%        |
+| Liam Lawson    | 95%        |
+| Lando Norris   | 90%        |
+
+#### Toelichting
+
+Deze derde variant gebruikt een derived table in plaats van CTE's. Binnen de FROM-clausule wordt eerst per race het maximale aantal ronden bepaald met een subquery (`rml`). Deze wordt direct gekoppeld aan de Result-tabel, waardoor het voltooiingspercentage per coureur per race kan worden berekend.
+
+In tegenstelling tot de eerdere implementaties wordt de aggregatie volledig in de hoofdquery uitgevoerd met een `GROUP BY` op coureur. Het laagste voltooiingspercentage per coureur wordt berekend via `MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps)`. De filtering op minimaal 90% gebeurt hier in de `HAVING`-clausule in plaats van in een `WHERE`. Deze aanpak is compacter maar combineert aggregatie en filtering in één stap.
+
+#### Query plan
+
+#### Aanbevolen indexen
+
 ### Vergelijking
 
 Hoewel beide query-plannen redelijk op elkaar lijken, is een van de eerste dingen die mij wel opvalt dat de alternatieve
@@ -353,6 +395,57 @@ create index Result_RaceId_FastestLapTime_index
     on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText, Points, Laps, FastestLap, ResultStatusId)
 go
 ```
+
+### Alternatieve Uitwerking 2
+
+#### Query
+
+```sql
+WITH FastestPerRace
+         AS (SELECT Result.RaceId             AS RaceId
+                  , MIN(Result.FastestLapTime) AS MinTime
+             FROM Result
+             WHERE Result.FastestLapTime IS NOT NULL
+             GROUP BY Result.RaceId)
+SELECT Circuit.CircuitName                               AS CircuitName
+     , Race.RaceDate                                     AS RaceDate
+     , CONCAT_WS(' ', Driver.Firstname, Driver.Lastname) AS Name
+     , Result.FastestLap                                 AS FastestLap
+     , Result.FastestLapTime                             AS FastestLapTime
+     , Result.PositionText                               AS Position
+     , Result.Points                                     AS Points
+     , Result.Laps                                       AS Laps
+     , ResultStatus.ResultStatus                         AS ResultStatus
+FROM FastestPerRace
+         INNER JOIN Result ON Result.RaceId = FastestPerRace.RaceId
+             AND Result.FastestLapTime = FastestPerRace.MinTime
+         INNER JOIN Race ON Race.RaceId = FastestPerRace.RaceId
+         INNER JOIN Driver ON Driver.DriverId = Result.DriverId
+         INNER JOIN Circuit ON Circuit.CircuitId = Race.CircuitId
+         INNER JOIN ResultStatus ON ResultStatus.ResultStatusId = Result.ResultStatusId
+WHERE Race.RaceYear BETWEEN 2004 AND 2024
+ORDER BY CircuitName, FastestLapTime;
+```
+
+#### Resultaten
+
+| CircuitName                    | RaceDate   | Name               | FastestLap | FastestLapTime   | Position | Points  | Laps | ResultStatus |
+|--------------------------------|------------|--------------------|------------|------------------|----------|---------|------|--------------|
+| Albert Park Grand Prix Circuit | 2024-03-24 | Charles Leclerc    | 56         | 00:01:19.8130000 | 2        | 19.0000 | 58   | Finished     |
+| Albert Park Grand Prix Circuit | 2023-04-02 | Sergio Perez       | 53         | 00:01:20.2350000 | 5        | 11.0000 | 58   | Finished     |
+| Albert Park Grand Prix Circuit | 2022-04-10 | Charles Leclerc    | 58         | 00:01:20.2600000 | 1        | 26.0000 | 58   | Finished     |
+| Albert Park Grand Prix Circuit | 2004-03-07 | Michael Schumacher | 29         | 00:01:24.1250000 | 1        | 10.0000 | 58   | Finished     |
+| ...                            | ...        | ...                | ...        | ...              | ...      | ...     | ...  | ...          |
+
+#### Toelichting
+
+Deze derde variant bepaalt eerst per race de snelste rondetijd via `MIN(Result.FastestLapTime) GROUP BY Result.RaceId`. De CTE `FastestPerRace` bevat dus per race de minimale rondetijd, die vervolgens via een join op zowel `RaceId` als `FastestLapTime` weer aan de Result-tabel wordt gekoppeld om de bijbehorende volledige resultaatregel op te halen.
+
+Deze aanpak is compacter dan de primaire implementatie (geen geneste subquery per race) en vermijdt het gebruik van window functions zoals de eerste alternatieve implementatie. Let op: indien meerdere coureurs exact dezelfde snelste rondetijd hebben, toont deze query beide resultaten. In de praktijk komt dit echter zelden voor.
+
+#### Query plan
+
+#### Aanbevolen indexen
 
 ### Vergelijking
 
@@ -580,6 +673,97 @@ vanaf waar hij de eerste plaats tot het einde vasthield.
 
 Er zijn geen indexen voorgesteld door de database management tool voor deze query.
 
+### Alternatieve Uitwerking 2
+
+#### Query
+
+```sql
+WITH SeasonWinner
+         AS (SELECT Race.RaceYear
+                  , DriverStanding.DriverId
+                  , CONCAT_WS(' ', Driver.Firstname, Driver.Lastname) AS DriverName
+             FROM DriverStanding
+                      INNER JOIN Race ON Race.RaceId = DriverStanding.RaceId
+                      INNER JOIN Driver ON Driver.DriverId = DriverStanding.DriverId
+             WHERE DriverStanding.Position = 1
+               AND Race.RaceYear BETWEEN 2015 AND 2024
+               AND Race.NrOfRound =
+                   (SELECT MAX(Race2.NrOfRound) FROM Race Race2 WHERE Race2.RaceYear = Race.RaceYear)),
+     ChampStandings
+         AS (SELECT Race.RaceYear
+                  , Race.RaceDate
+                  , Race.NrOfRound
+                  , Race.RaceName
+                  , DriverStanding.Position                                                AS StandPos
+                  , ROW_NUMBER() OVER (PARTITION BY Race.RaceYear ORDER BY Race.NrOfRound) AS Seq
+                  , COUNT(*) OVER (PARTITION BY Race.RaceYear)                             AS TotalRaces
+             FROM DriverStanding
+                      INNER JOIN Race ON Race.RaceId = DriverStanding.RaceId
+                      INNER JOIN SeasonWinner ON SeasonWinner.DriverId = DriverStanding.DriverId
+                          AND SeasonWinner.RaceYear = Race.RaceYear),
+     LastNonP1
+         AS (SELECT RaceYear
+                  , ISNULL(MAX(Seq), 0) AS LastNonP1Seq
+             FROM ChampStandings
+             WHERE StandPos > 1
+             GROUP BY RaceYear),
+     FirstUnbrokenP1
+         AS (SELECT ChampStandings.RaceYear
+                  , MIN(ChampStandings.Seq) AS FirstSeq
+             FROM ChampStandings
+                      INNER JOIN LastNonP1 ON LastNonP1.RaceYear = ChampStandings.RaceYear
+             WHERE ChampStandings.Seq > LastNonP1.LastNonP1Seq
+             GROUP BY ChampStandings.RaceYear),
+     ChampWins
+         AS (SELECT Race.RaceYear
+                  , COUNT(*) AS RaceWins
+             FROM Result
+                      INNER JOIN Race ON Race.RaceId = Result.RaceId
+                      INNER JOIN SeasonWinner
+                                 ON SeasonWinner.DriverId = Result.DriverId
+                                     AND SeasonWinner.RaceYear = Race.RaceYear
+             WHERE Result.Position = 1
+             GROUP BY Race.RaceYear)
+SELECT SeasonWinner.RaceYear     AS Seizoen
+     , SeasonWinner.DriverName   AS Kampioen
+     , ChampWins.RaceWins        AS RaceWins
+     , ChampStandings.TotalRaces AS TotaalRaces
+     , ChampStandings.RaceDate   AS LeiderVanaf
+     , ChampStandings.NrOfRound  AS Volgnummer
+     , ChampStandings.RaceName   AS Race
+FROM SeasonWinner
+         JOIN ChampWins ON ChampWins.RaceYear = SeasonWinner.RaceYear
+         JOIN FirstUnbrokenP1 ON FirstUnbrokenP1.RaceYear = SeasonWinner.RaceYear
+         JOIN ChampStandings ON ChampStandings.RaceYear = SeasonWinner.RaceYear
+             AND ChampStandings.Seq = FirstUnbrokenP1.FirstSeq
+ORDER BY SeasonWinner.RaceYear;
+```
+
+#### Resultaten
+
+| Seizoen | Kampioen       | RaceWins | TotaalRaces | LeiderVanaf | Volgnummer | Race                  |
+|---------|----------------|----------|-------------|-------------|------------|-----------------------|
+| 2015    | Lewis Hamilton | 10       | 19          | 2015-03-15  | 1          | Australian Grand Prix |
+| 2016    | Nico Rosberg   | 9        | 21          | 2016-09-18  | 15         | Singapore Grand Prix  |
+| 2017    | Lewis Hamilton | 9        | 20          | 2017-09-03  | 13         | Italian Grand Prix    |
+| 2018    | Lewis Hamilton | 11       | 21          | 2018-07-22  | 11         | German Grand Prix     |
+| 2019    | Lewis Hamilton | 11       | 21          | 2019-05-12  | 5          | Spanish Grand Prix    |
+| 2020    | Lewis Hamilton | 11       | 17          | 2020-07-19  | 3          | Hungarian Grand Prix  |
+| 2021    | Max Verstappen | 10       | 22          | 2021-10-10  | 16         | Turkish Grand Prix    |
+| 2022    | Max Verstappen | 15       | 22          | 2022-05-22  | 6          | Spanish Grand Prix    |
+| 2023    | Max Verstappen | 19       | 22          | 2023-03-05  | 1          | Bahrain Grand Prix    |
+| 2024    | Max Verstappen | 9        | 24          | 2024-03-02  | 1          | Bahrain Grand Prix    |
+
+#### Toelichting
+
+Deze derde variant combineert elementen van beide eerdere implementaties. Net als de primaire uitwerking gebruikt deze query meerdere CTE's, maar het totaal aantal races wordt hier met een window function (`COUNT(*) OVER (PARTITION BY Race.RaceYear)`) in `ChampStandings` berekend, waardoor de aparte CTE `SeasonTotals` vervalt.
+
+De bepaling van de eerste onafgebroken leidingspositie is anders opgezet: `LastNonP1` zoekt per seizoen de laatste race waarin de kampioen níet op positie 1 stond. `FirstUnbrokenP1` pakt vervolgens de eerstvolgende race daarna. Dit is een alternatieve benadering voor de logica in de eerdere implementaties, die ofwel via geneste subquery's ofwel via `NOT EXISTS` werkten.
+
+#### Query plan
+
+#### Aanbevolen indexen
+
 ### Vergelijking
 
 Deze vergelijking richt zich voornamelijk op de onderhoudbaarheid en performance van de queryplannen. Zoals eerder zichtbaar in de queryplannen, is het plan van de primaire implementatie dermate groot dat het niet met de standaard diagramtool opgeslagen kon worden en daarom moest worden omgezet naar een Draw.io-diagram. Dit illustreert de hoge complexiteit van de query, die een groot aantal operators bevat om tot een resultaat te komen. Vanuit onderhoudsperspectief is dit onwenselijk: toekomstige aanpassingen of optimalisaties worden hierdoor complex en foutgevoelig.
@@ -711,6 +895,44 @@ create index Result_RaceId_index
     on dbo.Result (RaceId) include (DriverId)
 go
 ```
+
+### Alternatieve Uitwerking
+
+#### Query
+
+```sql
+SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname) AS Coureur
+     , DriverYearRanges.Ranges                           AS Periodes
+FROM Driver
+         INNER JOIN DriverYearRanges ON DriverYearRanges.DriverId = Driver.DriverId
+WHERE DriverYearRanges.Ranges LIKE '%,%'
+ORDER BY Coureur;
+```
+
+#### Resultaten
+
+| Coureur         | Periodes                   |
+|-----------------|----------------------------|
+| Adrian Sutil    | 2007-2011, 2013-2014       |
+| Al Herman       | 1955-1957, 1959-1960       |
+| Al Pease        | 1967, 1969                 |
+| Alain Prost     | 1980-1991, 1993            |
+| Alan Jones      | 1975-1981, 1983, 1985-1986 |
+| Fernando Alonso | 2001, 2003-2018, 2021-2024 |
+| Michael Schumacher | 1991-2006, 2010-2012    |
+| Niki Lauda      | 1971-1979, 1982-1985       |
+| Nigel Mansell   | 1980-1992, 1994-1995       |
+| ...             | ...                        |
+
+#### Toelichting
+
+Deze alternatieve query is vrijwel identiek aan de primaire uitwerking, maar voegt een extra filter toe: `WHERE DriverYearRanges.Ranges LIKE '%,%'`. Hiermee worden alleen coureurs getoond die minstens twee losse periodes in hun carrière hebben gehad — oftewel coureurs die een onderbreking hebben gehad en later zijn teruggekeerd.
+
+De primaire uitwerking toont álle coureurs, inclusief degenen die één aaneengesloten periode hebben gereden. Met deze `WHERE`-clausule wordt het resultaat beperkt tot enkel de coureurs met een carrièreonderbreking, wat direct antwoord geeft op de oorspronkelijke vraag: "Welke coureurs hebben een periode niet deelgenomen en zijn later teruggekeerd?"
+
+#### Query plan
+
+#### Aanbevolen indexen
 
 ## Maak een overzicht van alle F1 coureurs die in hun volledige carrière 25 of meer wedstrijden hebben gewonnen. Toon per coureur zijn naam, in één veld een overzicht van de seizoenen waarin hij gereden heeft (ontbrekende jaren weglaten), het aantal races dat hij gestart is, het aantal races die hij gewonnen heeft en het percentage van het aantal races die hij gewonnen heeft ten opzichte van het aantal races dat hij gestart is. Een voorbeeld van hoe het er voor Michael Schumacher en Ayrton Senna uitziet, zie je hieronder.
 
@@ -852,6 +1074,51 @@ techniek: de tellingen worden niet vooraf in aparte CTE’s gegroepeerd, maar pe
 #### Aanbevolen indexen
 
 Er zijn geen indexen voorgesteld door de database management tool voor deze query.
+
+### Alternatieve Uitwerking 2
+
+#### Query
+
+```sql
+SELECT CONCAT_WS(' ', Driver.Firstname, Driver.Lastname)                                   AS Driver
+     , DriverYearRanges.Ranges                                                             AS Seasons
+     , COUNT(*)                                                                            AS Entries
+     , SUM(CASE WHEN Result.Position = 1 THEN 1 ELSE 0 END)                                AS Wins
+     , CONCAT(ROUND(CAST(SUM(CASE WHEN Result.Position = 1 THEN 1 ELSE 0 END) AS FLOAT)
+                    / COUNT(*) * 100, 2), '%')                                             AS Percentage
+FROM Driver
+         INNER JOIN Result ON Result.DriverId = Driver.DriverId
+         LEFT JOIN DriverYearRanges ON DriverYearRanges.DriverId = Driver.DriverId
+GROUP BY Driver.DriverId, Driver.Firstname, Driver.Lastname, DriverYearRanges.Ranges
+HAVING SUM(CASE WHEN Result.Position = 1 THEN 1 ELSE 0 END) >= 25
+ORDER BY Wins DESC;
+```
+
+#### Resultaten
+
+| Driver             | Seasons                    | Entries | Wins | Percentage |
+|--------------------|----------------------------|---------|------|------------|
+| Lewis Hamilton     | 2007-2024                  | 356     | 105  | 29.49%     |
+| Michael Schumacher | 1991-2006, 2010-2012       | 308     | 91   | 29.55%     |
+| Max Verstappen     | 2015-2024                  | 209     | 63   | 30.14%     |
+| Sebastian Vettel   | 2007-2022                  | 300     | 53   | 17.67%     |
+| Alain Prost        | 1980-1991, 1993            | 202     | 51   | 25.25%     |
+| Ayrton Senna       | 1984-1994                  | 162     | 41   | 25.31%     |
+| Fernando Alonso    | 2001, 2003-2018, 2021-2024 | 404     | 32   | 7.92%      |
+| Nigel Mansell      | 1980-1992, 1994-1995       | 192     | 31   | 16.15%     |
+| Jackie Stewart     | 1965-1973                  | 100     | 27   | 27%        |
+| Niki Lauda         | 1971-1979, 1982-1985       | 174     | 25   | 14.37%     |
+| Jim Clark          | 1960-1968                  | 73      | 25   | 34.25%     |
+
+#### Toelichting
+
+Deze derde variant voert de aggregatie direct uit met een `GROUP BY` en conditionele aggregatie. In plaats van de tellingen in aparte CTE's of via window functions te berekenen, worden het aantal deelnames (`COUNT(*)`) en overwinningen (`SUM(CASE WHEN Result.Position = 1 THEN 1 ELSE 0 END)`) in één enkele aggregatiestap bepaald.
+
+De filtering op minimaal 25 overwinningen gebeurt via de `HAVING`-clausule, omdat het om een geaggregeerde waarde gaat. De koppeling met `DriverYearRanges` gebeurt via een `LEFT JOIN`, zodat ook coureurs zonder geregistreerde periodes (theoretisch) niet wegvallen. Deze aanpak is de meest directe en compacte van de drie implementaties: alle aggregaties in één stap, zonder tussenliggende subquery's of CTE's.
+
+#### Query plan
+
+#### Aanbevolen indexen
 
 ### Vergelijking
 
@@ -1014,6 +1281,58 @@ create index Result_RaceId_index
     on dbo.Result (RaceId) include (DriverId, Position)
 go
 ```
+
+### Alternatieve Uitwerking 2
+
+#### Query
+
+```sql
+SELECT CONCAT_WS(' ', d.Firstname, d.Lastname)                          AS Driver
+     , dr.RaceYear                                                      AS Season
+     , ss.Races                                                         AS Races
+     , ss.Wins                                                          AS Wins
+     , CONCAT(CAST(ROUND(100.0 * ss.Wins / NULLIF(ss.Races, 0), 2)
+                  AS DECIMAL(10, 2)), '%')                              AS Percentage
+FROM (SELECT DISTINCT Result.DriverId, Race.RaceYear
+      FROM Result
+               INNER JOIN Race ON Race.RaceId = Result.RaceId) dr
+         CROSS APPLY (SELECT COUNT(*)                                                AS Races
+                           , SUM(CASE WHEN res.Position = 1 THEN 1 ELSE 0 END)       AS Wins
+                      FROM Result res
+                               INNER JOIN Race r ON r.RaceId = res.RaceId
+                      WHERE res.DriverId = dr.DriverId
+                        AND r.RaceYear = dr.RaceYear) ss
+         INNER JOIN Driver d ON d.DriverId = dr.DriverId
+ORDER BY ss.Wins * 1.0 / ss.Races DESC;
+```
+
+#### Resultaten
+
+| Driver             | Season | Races | Wins | Percentage |
+|--------------------|--------|-------|------|------------|
+| Jim Rathmann       | 1960   | 1     | 1    | 100.00%    |
+| Sam Hanks          | 1957   | 1     | 1    | 100.00%    |
+| Jim Clark          | 1968   | 1     | 1    | 100.00%    |
+| Johnnie Parsons    | 1950   | 1     | 1    | 100.00%    |
+| Bob Sweikert       | 1955   | 1     | 1    | 100.00%    |
+| Troy Ruttman       | 1952   | 1     | 1    | 100.00%    |
+| Bill Vukovich      | 1953   | 1     | 1    | 100.00%    |
+| Pat Flaherty       | 1956   | 1     | 1    | 100.00%    |
+| Lee Wallard        | 1951   | 1     | 1    | 100.00%    |
+| Bill Vukovich      | 1954   | 1     | 1    | 100.00%    |
+| Jimmy Bryan        | 1958   | 1     | 1    | 100.00%    |
+| Max Verstappen     | 2023   | 22    | 19   | 86.36%     |
+| ...                | ...    | ...   | ...  | ...        |
+
+#### Toelichting
+
+Deze derde variant gebruikt een afgeleide tabel (`dr`) om eerst alle unieke combinaties van coureur en seizoen op te halen via `SELECT DISTINCT`. Per combinatie wordt vervolgens met `CROSS APPLY` een subquery (`ss`) uitgevoerd die het aantal races en overwinningen in dat specifieke seizoen voor die coureur berekent.
+
+In tegenstelling tot de eerdere implementaties werkt deze query niet met een `GROUP BY` over de hele dataset, maar per individuele coureur-seizoen-combinatie. Dit kan voordelig zijn wanneer er een index op `Result(DriverId, RaceId)` aanwezig is, omdat de `CROSS APPLY`-subquery dan efficiënt per coureur de benodigde aggregaties kan uitvoeren. Het winstpercentage wordt vervolgens per rij berekend en de sortering gebeurt op aflopend percentage.
+
+#### Query plan
+
+#### Aanbevolen indexen
 
 ### Vergelijking
 
@@ -1343,6 +1662,63 @@ create index DriverStanding_RaceId_index
     on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
 go
 ```
+
+### Alternatieve Uitwerking 2
+
+#### Query
+
+```sql
+WITH LastRace AS (
+    SELECT TOP 1 RaceId
+    FROM Race
+    WHERE RaceYear = 2021
+    ORDER BY RaceDate DESC
+)
+SELECT DriverStanding.Position                                       AS POS
+     , Driver.Firstname + ' ' + Driver.Lastname                      AS DRIVER
+     , Driver.Nationality                                            AS NATIONALITY
+     , (SELECT TOP 1 Constructor.ContstructorName
+        FROM Result
+                 INNER JOIN Constructor ON Constructor.ConstructorId = Result.ConstructorId
+        WHERE Result.DriverId = Driver.DriverId
+          AND Result.RaceId = LastRace.RaceId
+        ORDER BY Result.ResultId DESC)                               AS CAR
+     , DriverStanding.Points                                         AS PTS
+FROM DriverStanding
+         INNER JOIN Driver ON DriverStanding.DriverId = Driver.DriverId
+         INNER JOIN Race ON DriverStanding.RaceId = Race.RaceId
+         CROSS JOIN LastRace
+WHERE Race.RaceYear = 2021
+  AND Race.RaceId = LastRace.RaceId
+ORDER BY DriverStanding.Position;
+```
+
+#### Resultaten
+
+| POS | DRIVER           | NATIONALITY | CAR            | PTS            |
+|-----|------------------|-------------|----------------|----------------|
+| 1   | Max Verstappen   | Dutch       | Red Bull       | 395.5000000000 |
+| 2   | Lewis Hamilton   | British     | Mercedes       | 387.5000000000 |
+| 3   | Valtteri Bottas  | Finnish     | Mercedes       | 226.0000000000 |
+| 4   | Sergio Perez     | Mexican     | Red Bull       | 190.0000000000 |
+| 5   | Carlos Sainz     | Spanish     | Ferrari        | 164.5000000000 |
+| 6   | Lando Norris     | British     | McLaren        | 160.0000000000 |
+| 7   | Charles Leclerc  | Monegasque  | Ferrari        | 159.0000000000 |
+| 8   | Daniel Ricciardo | Australian  | McLaren        | 115.0000000000 |
+| 9   | Pierre Gasly     | French      | AlphaTauri     | 110.0000000000 |
+| 10  | Fernando Alonso  | Spanish     | Alpine F1 Team | 81.0000000000  |
+| 11  | Esteban Ocon     | French      | Alpine F1 Team | 74.0000000000  |
+| ... | ...              | ...         | ...            | ...            |
+
+#### Toelichting
+
+Deze derde variant isoleert de bepaling van de laatste race in een aparte CTE `LastRace`, die via `CROSS JOIN` aan elke rij wordt toegevoegd. De constructor wordt hier opgehaald via een gecorreleerde subquery in de `SELECT`-clausule, die per coureur het meest recente resultaat in de laatste race opzoekt.
+
+Het gebruik van een `CROSS JOIN` met een CTE van één rij is een lichte en overzichtelijke manier om de laatste race beschikbaar te maken voor de rest van de query. De gecorreleerde subquery voor de constructor maakt de query zelf compacter, maar kan bij grotere aantallen rijen minder efficiënt zijn dan een `JOIN`-aanpak, omdat de subquery per teruggegeven rij opnieuw wordt uitgevoerd.
+
+#### Query plan
+
+#### Aanbevolen indexen
 
 ### Vergelijking
 
