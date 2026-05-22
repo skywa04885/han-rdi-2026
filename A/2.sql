@@ -1,3 +1,6 @@
+SET STATISTICS IO ON;
+SET STATISTICS TIME ON;
+
 -- Option 1
 WITH FastestRaceResult
          AS (SELECT (SELECT TOP 1 Result.ResultId
