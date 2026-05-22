@@ -154,6 +154,9 @@ WHERE NOT EXISTS (SELECT 1
                   WHERE r.RaceId = #RaceResults.RaceNr
                     AND r.DriverId = d.DriverId);
 
+SET STATISTICS IO ON;
+SET STATISTICS TIME ON;
+
 -- Optie 1
 SELECT DriverStanding.Position                  AS POS
      , Driver.Firstname + ' ' + Driver.Lastname AS DRIVER
