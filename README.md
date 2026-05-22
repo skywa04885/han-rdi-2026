@@ -1738,7 +1738,10 @@ daarmee beter onderbouwde aannames over de data, wat zich ook vertaalt in een la
 
 # Constraints (B)
 
-Voor de onderstaande constraints zijn zowel stored procedures als AFTER triggers geïmplementeerd. Op deze manier konden beide oplossingen met elkaar worden vergeleken op het gebied van werking, controle en toepasbaarheid binnen de database. Daarnaast is aandacht besteed aan correcte foutafhandeling door middel van verschillende testsets, waarmee gecontroleerd is hoe de stored procedures en triggers reageren op zowel geldige als ongeldige invoer.
+Voor de onderstaande constraints zijn zowel stored procedures als AFTER triggers geïmplementeerd. Op deze manier 
+konden beide oplossingen met elkaar worden vergeleken op het gebied van werking, controle en toepasbaarheid binnen de 
+database. Daarnaast is aandacht besteed aan correcte foutafhandeling door middel van verschillende testsets, waarmee 
+gecontroleerd is hoe de stored procedures en triggers reageren op zowel geldige als ongeldige invoer.
 
 De volgende constraints zijn uitgewerkt:
 
@@ -1753,7 +1756,9 @@ De volgende constraints zijn uitgewerkt:
 
 (Constraint 5 niet uitvoerbaar)
 
-In dit hoofdstuk worden per constraint zowel de stored procedure als de trigger besproken en geanalyseerd. Vervolgens wordt per onderdeel een afweging gemaakt tussen beide implementaties en wordt gemotiveerd welke oplossing de voorkeur heeft, hier gaan de testresultaten ook aan bijdragen.
+In dit hoofdstuk worden per constraint zowel de stored procedure als de trigger besproken en geanalyseerd. Vervolgens 
+wordt per onderdeel een afweging gemaakt tussen beide implementaties en wordt gemotiveerd welke oplossing de voorkeur 
+heeft, hier gaan de testresultaten ook aan bijdragen.
 
 ## Constraint 1: Vanaf seizoen 1962 komt per race een positie slechts één keer voor in de uitslag.
 
