@@ -1736,6 +1736,25 @@ vermijden. Daarnaast is het gebruik van `ORDER BY RaceDate DESC` om de laatste r
 dan `MAX(RaceId)`, omdat een RaceId niet gegarandeerd chronologisch oploopt. De alternatieve implementatie maakt 
 daarmee beter onderbouwde aannames over de data, wat zich ook vertaalt in een lagere totale query cost.
 
+# Constraints (B)
+
+Voor de onderstaande constraints zijn zowel stored procedures als AFTER triggers geïmplementeerd. Op deze manier konden beide oplossingen met elkaar worden vergeleken op het gebied van werking, controle en toepasbaarheid binnen de database. Daarnaast is aandacht besteed aan correcte foutafhandeling door middel van verschillende testsets, waarmee gecontroleerd is hoe de stored procedures en triggers reageren op zowel geldige als ongeldige invoer.
+
+De volgende constraints zijn uitgewerkt:
+
+1. Vanaf seizoen 1962 komt een positie per race slechts één keer voor in de uitslag.
+2. Vanaf seizoen 1979 komt een coureur maximaal één keer voor in de uitslag van een race.
+3. Een seizoen bevat maximaal 25 races.
+4. Vanaf seizoen 2014 mag een startnummer binnen een seizoen slechts door één coureur worden gebruikt.
+5. Voor de kwalificatie van een race geldt per coureur één van de volgende situaties:
+-alleen kwalificatie 1 gereden;
+-alleen kwalificatie 1 en 2 gereden;
+-alle kwalificaties gereden.
+
+In dit hoofdstuk worden per constraint zowel de stored procedure als de trigger besproken en geanalyseerd. Vervolgens wordt per onderdeel een afweging gemaakt tussen beide implementaties en wordt gemotiveerd welke oplossing de voorkeur heeft, hier gaan de testresultaten ook aan bijdragen.
+
+## Vanaf seizoen 1962 komt per race een positie slechts één keer voor in de uitslag.
+
 # Indexeren (D)
 
 Tijdens het uitwerken van de bevragingen in opdracht A zijn diverse indexen naar boven gekomen die
