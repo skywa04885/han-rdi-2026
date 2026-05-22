@@ -1751,9 +1751,17 @@ De volgende constraints zijn uitgewerkt:
 -alleen kwalificatie 1 en 2 gereden;
 -alle kwalificaties gereden.
 
+(Constraint 5 niet uitvoerbaar)
+
 In dit hoofdstuk worden per constraint zowel de stored procedure als de trigger besproken en geanalyseerd. Vervolgens wordt per onderdeel een afweging gemaakt tussen beide implementaties en wordt gemotiveerd welke oplossing de voorkeur heeft, hier gaan de testresultaten ook aan bijdragen.
 
 ## Vanaf seizoen 1962 komt per race een positie slechts één keer voor in de uitslag.
+
+## Vanaf seizoen 1979 komt een coureur maximaal één keer voor in de uitslag van een race.
+
+## Een seizoen bevat maximaal 25 races.
+
+## Vanaf seizoen 2014 mag een startnummer binnen een seizoen slechts door één coureur worden gebruikt.
 
 # Indexeren (D)
 
