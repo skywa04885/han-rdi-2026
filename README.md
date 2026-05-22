@@ -1768,6 +1768,129 @@ heeft, hier gaan de testresultaten ook aan bijdragen.
 
 ## Vanaf seizoen 2014 mag een startnummer binnen een seizoen slechts door één coureur worden gebruikt.
 
+# Transactie Management & Concurrency (C)
+
+De triggers en stored procedures uit opdracht B werken correct binnen de opgestelde testcases. Toch betekent dit niet 
+automatisch dat de implementatie ook veilig is binnen een echte applicatieomgeving. In een productieomgeving kunnen
+meerdere gebruikers of processen namelijk tegelijkertijd dezelfde gegevens proberen te lezen of aan te passen. 
+Hierdoor kunnen race conditions en andere concurrency-problemen ontstaan.
+
+Vooral bij stored procedures en triggers die databankregels en integriteit moeten afdwingen, is het belangrijk om 
+rekening te houden met transacties en isolation levels. Een implementatie die functioneel correct lijkt, kan zonder 
+het juiste isolation level alsnog inconsistente data toelaten.
+
+In dit onderdeel wordt onderzocht welke isolation levels het meest geschikt zijn voor de uitgewerkte business rules. 
+Daarnaast wordt bekeken welke problemen kunnen ontstaan bij het standaard isolation level `READ COMMITTED`, en hoe 
+hogere isolation levels deze problemen kunnen voorkomen.
+
+## Vanaf seizoen 1962 komt per race een positie slechts één keer voor in de uitslag
+
+### Stored Procedure & Trigger
+
+Aanbevolen isolation level: `SERIALIZABLE`
+
+Zowel de stored procedures als de trigger controleren eerst of een bepaalde positie binnen een race al bestaat 
+voordat de wijziging wordt uitgevoerd. Hierdoor ontstaat een klassiek concurrency-probleem.
+
+Bij het standaard isolation level `READ COMMITTED` kunnen twee transacties tegelijkertijd controleren of dezelfde 
+positie nog vrij is. Omdat niet-gecommitte wijzigingen niet zichtbaar zijn, kunnen beide transacties denken dat de 
+positie beschikbaar is. Uiteindelijk worden dan toch dubbele posities opgeslagen.
+
+`READ COMMITTED` houdt locks slechts kort vast tijdens het lezen van data. Hierdoor kunnen andere transacties 
+tussendoor nieuwe rijen toevoegen die de controle ongeldig maken.
+
+Met `SERIALIZABLE` blijven de locks actief gedurende de volledige transactie. Daarnaast voorkomt dit isolation level 
+ook zogenaamde *phantom rows*, waardoor geen nieuwe records kunnen worden toegevoegd die binnen dezelfde controle 
+vallen.
+
+Hierdoor blijft de combinatie van `RaceId` en `Position` betrouwbaar uniek, ook wanneer meerdere transacties 
+gelijktijdig uitgevoerd worden.
+
+---
+
+## Vanaf seizoen 1979 komt een coureur maximaal één keer voor in de uitslag van een race
+
+### Stored Procedure & Trigger
+
+Aanbevolen isolation level: `SERIALIZABLE`
+
+Deze business rule controleert of een driver al voorkomt binnen dezelfde race. De stored procedures en trigger 
+voeren eerst een controle uit en passen daarna pas de data aan.
+
+Bij `READ COMMITTED` kunnen twee transacties tegelijk dezelfde `DriverId` voor dezelfde race invoegen of aanpassen. 
+Beide transacties zien de wijziging van de andere nog niet en gaan er dus vanuit dat de invoer geldig is. Hierdoor 
+kan dezelfde coureur uiteindelijk meerdere keren in dezelfde uitslag voorkomen.
+
+Omdat locks bij `READ COMMITTED` snel worden vrijgegeven, kunnen andere transacties tijdens de controle nog steeds 
+nieuwe records toevoegen die de validatie beïnvloeden.
+
+Met `SERIALIZABLE` blijven de locks actief tot het einde van de transactie en worden ook nieuwe invoegen binnen 
+dezelfde zoekresultaten tegengehouden. Hierdoor blijft de combinatie van `RaceId` en `DriverId` correct uniek.
+
+---
+
+## Er is een maximum van 25 races per seizoen
+
+### Stored Procedure & Trigger
+
+Aanbevolen isolation level: `SERIALIZABLE`
+
+Bij deze regel wordt eerst geteld hoeveel races al aanwezig zijn binnen een seizoen. Daarna wordt pas een nieuwe race 
+toegevoegd of aangepast.
+
+Onder `READ COMMITTED` kan een race condition ontstaan wanneer twee transacties tegelijkertijd het aantal races 
+controleren. Beide transacties kunnen bijvoorbeeld 24 races tellen en besluiten dat er nog één race toegevoegd mag 
+worden. Wanneer beide transacties daarna succesvol uitvoeren, bevat het seizoen uiteindelijk 26 races.
+
+Omdat `READ COMMITTED` de locks na het lezen vrijgeeft, kan een andere transactie ondertussen nog extra records 
+toevoegen binnen hetzelfde seizoen.
+
+`SERIALIZABLE` voorkomt dit probleem doordat het de gelezen gegevens en het zoekbereik van de query vasthoudt tot het 
+einde van de transactie. Hierdoor kunnen geen extra races worden toegevoegd zolang de controle bezig is.
+
+Op deze manier blijft de limiet van maximaal 25 races per seizoen gegarandeerd behouden.
+
+---
+
+## Vanaf seizoen 2014 kan een startnummer per seizoen maar door één coureur worden gebruikt
+
+### Stored Procedure
+
+Aanbevolen isolation level: `SERIALIZABLE`
+
+De stored procedures controleren of een bepaald `ResultNumber` binnen hetzelfde seizoen al gekoppeld is aan een andere 
+driver. Pas daarna wordt de wijziging uitgevoerd.
+
+Bij `READ COMMITTED` kunnen twee transacties tegelijk hetzelfde startnummer controleren. Omdat beide transacties de 
+wijziging van de andere nog niet zien, kunnen ze allebei besluiten dat het nummer nog beschikbaar is. Hierdoor kan 
+hetzelfde startnummer uiteindelijk toch aan meerdere coureurs gekoppeld worden.
+
+Doordat locks bij `READ COMMITTED` slechts tijdelijk actief blijven, kunnen andere transacties ondertussen nieuwe 
+records toevoegen die de controle ongeldig maken.
+
+Met `SERIALIZABLE` blijven de locks behouden tijdens de volledige transactie en worden ook nieuwe invoegen binnen 
+dezelfde controle tegengehouden. Hierdoor blijft elk startnummer uniek binnen een seizoen.
+
+### Trigger
+
+Aanbevolen isolation level: `REPEATABLE READ`
+
+Voor deze trigger is `REPEATABLE READ` een verdedigbare keuze. De trigger controleert voornamelijk bestaande records 
+om te bepalen of een `ResultNumber` al gekoppeld is aan een andere driver binnen hetzelfde seizoen.
+
+Bij `READ COMMITTED` kunnen gelezen rijen tijdens de transactie nog aangepast worden door andere transacties. Hierdoor 
+kan de controle achteraf ongeldig blijken.
+
+Met `REPEATABLE READ` blijven de gelezen rijen gelocked tot het einde van de transactie. Daardoor kunnen bestaande 
+records die deel uitmaken van de controle niet tussentijds aangepast worden.
+
+Wel blijft er nog een mogelijk probleem bestaan met zogenaamde *phantom rows*. Een andere transactie zou namelijk 
+nog steeds een volledig nieuwe rij kunnen invoegen met hetzelfde startnummer. Om ook dat volledig te voorkomen, 
+zou `SERIALIZABLE` nodig zijn.
+
+Toch is `REPEATABLE READ` hier een redelijke afweging, omdat de trigger voornamelijk bestaande conflicterende 
+records controleert in plaats van grote aantallen nieuwe inserts te verwerken.
+
 # Indexeren (D)
 
 Tijdens het uitwerken van de bevragingen in opdracht A zijn diverse indexen naar boven gekomen die
