@@ -2146,7 +2146,7 @@ Voor de evaluatie van deze index zal er gekeken worden naar het 7e vraagstuk.
 [2026-05-22 14:29:03] 20 rows retrieved starting from 1 in 341 ms (execution: 15 ms, fetching: 326 ms)
 ```
 
-#### Nieuwe executieplannen en IO
+#### Nieuwe executieplannen en IO & Onderbouwing Verschillen
 
 ##### Primaire implementatie
 
@@ -2163,6 +2163,32 @@ Voor de evaluatie van deze index zal er gekeken worden naar het 7e vraagstuk.
 [2026-05-22 15:06:09] CPU time = 0 ms,  elapsed time = 0 ms.
 [2026-05-22 15:06:09] 20 rows retrieved starting from 1 in 318 ms (execution: 3 ms, fetching: 315 ms)
 ```
+
+Een van de eerste en belangrijkste verschillen die zichtbaar is, is dat er na het toevoegen van de index in het 
+executieplan op veel plaatsen geen gebruik meer wordt gemaakt van een *Full Index Scan*, maar in plaats daarvan van 
+een veel efficiëntere *Index Scan*. Verder is bij de lookup van zowel entries uit de `DriverStanding`- als de 
+`Result`-tabellen duidelijk te zien dat de index effect heeft gehad. In plaats van het uitlezen van tienduizenden 
+rijen, worden nu in beide gevallen slechts enkele tientallen relevante rijen gelezen. Dit zorgt voor een drastische 
+verlaging van zowel de kosten als de uitvoeringstijd.
+
+De gevallen waarbij nog wel *Full Index Scan*-operators worden gebruikt, zijn niet relevant voor de huidige index en 
+tonen daarom ook niet de effectiviteit ervan aan. De onderdelen waarbij deze index wél relevant is, laten daarentegen 
+aanzienlijke verbeteringen zien, waaruit geconcludeerd kan worden dat de index effectief is.
+
+Verder is te zien dat er meer gebruik wordt gemaakt van *Nested Loop*-operators in plaats van *Hash Join*-operators. 
+In dit geval is dat een positief teken, omdat de indexen effectief genoeg zijn om een *Hash Join* overbodig te maken; 
+een eenvoudige loop-constructie blijkt hier sneller te zijn.
+
+Tot slot laten ook de IO- en tijdsstatistieken duidelijk verschillen zien. De CPU-tijd is aanzienlijk lager geworden en 
+zowel de `DriverStanding`- als de `Result`-tabel hebben een veel lager aantal *logical reads*. Daarnaast is ook het 
+aantal *physical reads* afgenomen. Hoewel dit aantal eerder al laag was, is het nu teruggebracht van enkele reads 
+naar nul.
+
+Wel is het belangrijk om te vermelden dat, door de aanwezigheid van een andere index op `DriverStanding`, de 
+optimalisatie niet uitsluitend wordt veroorzaakt door de index op `Result`. Omdat de lookup op `Result` echter
+aanzienlijk efficiënter verloopt, kan alsnog geconcludeerd worden dat deze index effectief is. Tegelijkertijd kan ook 
+de index op `DriverStanding` in deze situatie als effectief worden beschouwd.
+
 
 ##### Alternatieve implementatie
 
