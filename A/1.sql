@@ -2,6 +2,9 @@
 -- Option 1
 ------------------------------------------------------------------------------------------------------------------------
 
+SET STATISTICS IO ON;
+SET STATISTICS TIME ON;
+
 /*
 NOTICE:
 Due to the absence of a column that specifies the total number of laps for each race, the assumption has been made
@@ -76,11 +79,11 @@ ORDER BY DriverCompletion.MinCompletion DESC;
 -- Option 3
 ------------------------------------------------------------------------------------------------------------------------
 
-SELECT CONCAT_WS(' ', d.Firstname, d.Lastname)                         AS Name
+SELECT CONCAT_WS(' ', d.Firstname, d.Lastname)                                                AS Name
      , CONCAT(CAST(ROUND(MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps), 2) * 100 AS VARCHAR), '%') AS Completion
 FROM Result r
          INNER JOIN Race ON Race.RaceId = r.RaceId
-         INNER JOIN (SELECT Result.RaceId      AS RaceId
+         INNER JOIN (SELECT Result.RaceId    AS RaceId
                           , MAX(Result.Laps) AS MaxLaps
                      FROM Result
                               INNER JOIN Race ON Race.RaceId = Result.RaceId

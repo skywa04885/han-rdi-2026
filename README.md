@@ -1661,6 +1661,77 @@ queries volledig uit de index gehaald kunnen worden, zonder extra lookups.
 
 ### Index op `RaceId` (en `DriverId`) in `Result`
 
+Om de effectiviteit van deze eerste index te valideren, wordt er gekeken naar de eerste bevraging. Tijdens
+deze validatie, wordt er gekeken naar de mogelijke veranderingen in het executieplan en IO-statistieken. Wel is
+het hierbij belangrijk om te vermelden dat deze index impact gaat hebben op meerdere vraagstukken, maar dat deze
+weggelaten zijn omdat een enkele vergelijking al voldoende beeld zal moeten vormen. De andere bevragingen die beïnvloedt
+worden zijn als volgt: 4, 5, 6 en 7.
+
+#### Oorspronkelijke executieplannen en IO
+
+##### Primaire implementatie
+
+![Queryplan primaire implementatie](./assets/1-primary-query-plan.png)
+
+```sql
+[2026-05-22 14:15:17] [S0000][3615] Table 'Driver'. Scan count 0, logical reads 10, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:17] [S0000][3615] Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:17] [S0000][3615] Table 'Workfile'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:17] [S0000][3615] Table 'Result'. Scan count 2, logical reads 654, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:17] [S0000][3615] Table 'Race'. Scan count 2, logical reads 68, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:17] [S0000][3612] SQL Server Execution Times:
+[2026-05-22 14:15:17] CPU time = 3 ms,  elapsed time = 3 ms.
+[2026-05-22 14:15:17] 5 rows retrieved starting from 1 in 334 ms (execution: 12 ms, fetching: 322 ms)
+```
+
+##### Alternatieve implementatie
+
+![Queryplan alternatieve implementatie](./assets/1-alternative-query-plan.png)
+
+```sql
+[2026-05-22 14:15:35] [S0000][3615] Table 'Driver'. Scan count 1, logical reads 36, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:35] [S0000][3615] Table 'Worktable'. Scan count 3, logical reads 1055, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:35] [S0000][3615] Table 'Workfile'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:35] [S0000][3615] Table 'Result'. Scan count 1, logical reads 327, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:35] [S0000][3615] Table 'Race'. Scan count 1, logical reads 34, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:15:35] [S0000][3612] SQL Server Execution Times:
+[2026-05-22 14:15:35] CPU time = 4 ms,  elapsed time = 4 ms.
+[2026-05-22 14:15:35] 5 rows retrieved starting from 1 in 327 ms (execution: 10 ms, fetching: 317 ms)
+```
+
+#### Nieuwe executieplannen en IO
+
+##### Primaire implementatie
+
+
+![Queryplan primaire implementatie post index](./assets/1-primary-query-plan-post-index.png)
+
+```sql
+[2026-05-22 14:13:08] [S0000][3615] Table 'Driver'. Scan count 0, logical reads 10, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:13:08] [S0000][3615] Table 'Worktable'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:13:08] [S0000][3615] Table 'Result'. Scan count 48, logical reads 98, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:13:08] [S0000][3615] Table 'Workfile'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:13:08] [S0000][3615] Table 'Race'. Scan count 2, logical reads 68, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:13:08] [S0000][3612] SQL Server Execution Times:
+[2026-05-22 14:13:08] CPU time = 1 ms,  elapsed time = 0 ms.
+[2026-05-22 14:13:08] 5 rows retrieved starting from 1 in 327 ms (execution: 5 ms, fetching: 322 ms)
+```
+
+##### Alternatieve implementatie
+
+![Queryplan alternatieve implementatie post index](./assets/1-alternative-query-plan-post-index.png)
+
+```sql
+[2026-05-22 14:14:29] [S0000][3615] Table 'Driver'. Scan count 1, logical reads 36, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:14:29] [S0000][3615] Table 'Worktable'. Scan count 3, logical reads 1055, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:14:29] [S0000][3615] Table 'Workfile'. Scan count 0, logical reads 0, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:14:29] [S0000][3615] Table 'Result'. Scan count 24, logical reads 49, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:14:29] [S0000][3615] Table 'Race'. Scan count 1, logical reads 34, physical reads 0, page server reads 0, read-ahead reads 0, page server read-ahead reads 0, lob logical reads 0, lob physical reads 0, lob page server reads 0, lob read-ahead reads 0, lob page server read-ahead reads 0.
+[2026-05-22 14:14:29] [S0000][3612] SQL Server Execution Times:
+[2026-05-22 14:14:29] CPU time = 1 ms,  elapsed time = 1 ms.
+[2026-05-22 14:14:29] 5 rows retrieved starting from 1 in 321 ms (execution: 7 ms, fetching: 314 ms)
+```
+
 ### Index op `RaceId` van `DriverStanding`
 
 ### Index op `RaceId` en `FastestLapTime` van `Result`
