@@ -1755,13 +1755,736 @@ De volgende constraints zijn uitgewerkt:
 
 In dit hoofdstuk worden per constraint zowel de stored procedure als de trigger besproken en geanalyseerd. Vervolgens wordt per onderdeel een afweging gemaakt tussen beide implementaties en wordt gemotiveerd welke oplossing de voorkeur heeft, hier gaan de testresultaten ook aan bijdragen.
 
-## Vanaf seizoen 1962 komt per race een positie slechts één keer voor in de uitslag.
+## Constraint 1: Vanaf seizoen 1962 komt per race een positie slechts één keer voor in de uitslag.
 
-## Vanaf seizoen 1979 komt een coureur maximaal één keer voor in de uitslag van een race.
+### AFTER Trigger
 
-## Een seizoen bevat maximaal 25 races.
+De trigger controleert bij iedere `INSERT` of `UPDATE` op de `Result`-tabel of er na de wijziging
+geen dubbele posities zijn ontstaan binnen dezelfde race, voor races vanaf 1962.
 
-## Vanaf seizoen 2014 mag een startnummer binnen een seizoen slechts door één coureur worden gebruikt.
+```sql
+CREATE OR ALTER TRIGGER ResultDuplicatePositionTrigger
+    ON Result
+    AFTER INSERT, UPDATE
+    AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @DuplicateInfo NVARCHAR(500)
+
+    SELECT TOP 1 @DuplicateInfo = CONCAT('Duplicate position detected: RaceId = ', CAST(Result.RaceId AS NVARCHAR(20)),
+                                         ', Position = ', CAST(Result.Position AS NVARCHAR(20)),
+                                         ', Count = ', CAST(COUNT(1) AS NVARCHAR(20)))
+    FROM Result
+             INNER JOIN Race ON Race.RaceId = Result.RaceId
+    WHERE Result.Position IS NOT NULL
+      AND Race.RaceYear >= 1962
+      AND Result.RaceId IN (SELECT RaceId FROM inserted)
+    GROUP BY Result.RaceId, Result.Position
+    HAVING COUNT(1) > 1
+
+    IF @DuplicateInfo IS NOT NULL
+        BEGIN
+            THROW 50001, @DuplicateInfo, 1
+        END
+END
+GO
+```
+
+### Stored Procedure
+
+De stored procedure-oplossing bestaat uit twee procedures: `CreateResultProcedure` voor het invoegen
+en `UpdateResultProcedure` voor het bijwerken van resultaten. Beide controleren vooraf of de positie
+nog beschikbaar is in de race (vanaf 1962).
+
+```sql
+CREATE OR ALTER PROCEDURE CreateResultProcedure(
+    @ResultId INT,
+    @RaceId INT,
+    @DriverId INT,
+    @ConstructorId INT = NULL,
+    @ResultNumber INT = NULL,
+    @Grid INT = NULL,
+    @Position INT = NULL,
+    @PositionText NVARCHAR(50) = NULL,
+    @PositionOrder INT = NULL,
+    @Points DECIMAL(18, 4) = NULL,
+    @Laps INT = NULL,
+    @Time NVARCHAR(50) = NULL,
+    @Milliseconds INT = NULL,
+    @FastestLap INT = NULL,
+    @Rank INT = NULL,
+    @FastestLapTime TIME = NULL,
+    @FastestLapSpeed DECIMAL(18, 4) = NULL,
+    @ResultStatusId INT = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @RaceYear INT = NULL
+
+    SELECT @RaceYear = Race.RaceYear
+    FROM Race
+    WHERE Race.RaceId = @RaceId
+
+    IF @RaceYear IS NULL
+        BEGIN
+            THROW 50001, 'Race does not exist', 1
+        END
+
+    IF @RaceYear >= 1962 AND EXISTS(SELECT 1 FROM Result WHERE RaceId = @RaceId AND Position = @Position)
+        BEGIN
+            THROW 50001, 'Position is already occupied in race', 2
+        END
+
+    INSERT INTO Result (ResultId, RaceId, DriverId, ConstructorId, ResultNumber, Grid, Position, PositionText,
+                        PositionOrder, Points, Laps, Time, Milliseconds, FastestLap, Rank, FastestLapTime,
+                        FastestLapSpeed, ResultStatusId)
+    VALUES (@ResultId, @RaceId, @DriverId, @ConstructorId, @ResultNumber,
+            @Grid, @Position, @PositionText, @PositionOrder, @Points,
+            @Laps, @Time, @Milliseconds, @FastestLap, @Rank,
+            @FastestLapTime, @FastestLapSpeed, @ResultStatusId)
+END
+GO
+
+CREATE OR ALTER PROCEDURE UpdateResultProcedure(
+    @ResultId INT,
+    @RaceId INT,
+    @DriverId INT,
+    @ConstructorId INT = NULL,
+    @ResultNumber INT = NULL,
+    @Grid INT = NULL,
+    @Position INT = NULL,
+    @PositionText NVARCHAR(50) = NULL,
+    @PositionOrder INT = NULL,
+    @Points DECIMAL(18, 4) = NULL,
+    @Laps INT = NULL,
+    @Time NVARCHAR(50) = NULL,
+    @Milliseconds INT = NULL,
+    @FastestLap INT = NULL,
+    @Rank INT = NULL,
+    @FastestLapTime TIME = NULL,
+    @FastestLapSpeed DECIMAL(18, 4) = NULL,
+    @ResultStatusId INT = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @RaceYear INT = NULL;
+
+    SELECT @RaceYear = RaceYear
+    FROM Race
+    WHERE RaceId = @RaceId;
+
+    IF @RaceYear IS NULL
+    BEGIN
+        THROW 50001, 'Race does not exist', 1;
+    END
+
+    IF NOT EXISTS (SELECT 1 FROM Result WHERE ResultId = @ResultId)
+    BEGIN
+        THROW 50001, 'Result does not exist', 1;
+    END
+
+    IF @RaceYear >= 1962 AND EXISTS (
+        SELECT 1
+        FROM Result
+        WHERE RaceId = @RaceId
+          AND Position = @Position
+          AND ResultId <> @ResultId
+    )
+    BEGIN
+        THROW 50001, 'Position is already occupied in race', 2;
+    END
+
+    UPDATE Result
+    SET RaceId = @RaceId,
+        DriverId = @DriverId,
+        ConstructorId = @ConstructorId,
+        ResultNumber = @ResultNumber,
+        Grid = @Grid,
+        Position = @Position,
+        PositionText = @PositionText,
+        PositionOrder = @PositionOrder,
+        Points = @Points,
+        Laps = @Laps,
+        Time = @Time,
+        Milliseconds = @Milliseconds,
+        FastestLap = @FastestLap,
+        Rank = @Rank,
+        FastestLapTime = @FastestLapTime,
+        FastestLapSpeed = @FastestLapSpeed,
+        ResultStatusId = @ResultStatusId
+    WHERE ResultId = @ResultId;
+END
+GO
+```
+
+### Voorkeur: AFTER Trigger
+
+Voor deze constraint gaat de voorkeur uit naar de AFTER trigger. De belangrijkste reden is
+data-integriteit: de trigger wordt automatisch afgevuurd bij elke `INSERT` en `UPDATE` op de
+Result-tabel, ongeacht via welke weg de data wordt gewijzigd (directe SQL, applicatiecode, of
+andere stored procedures). Bij de stored procedure is de constraint alleen afgedwongen als alle
+applicaties en gebruikers consequent de procedure gebruiken, wat in de praktijk lastig af te
+dwingen is. De trigger garandeert dat de constraint altijd wordt gehandhaafd, ongeacht de bron
+van de datawijziging.
+
+---
+
+## Constraint 2: Vanaf seizoen 1979 komt een coureur maximaal één keer voor in de uitslag van een race.
+
+### AFTER Trigger
+
+De trigger controleert bij `INSERT` of `UPDATE` op de `Result`-tabel of een coureur niet meer
+dan één keer voorkomt in dezelfde race, voor races vanaf 1979.
+
+```sql
+CREATE OR ALTER TRIGGER ResultDuplicateDriverTrigger
+    ON Result
+    AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @DuplicateInfo NVARCHAR(500);
+
+    SELECT TOP 1
+        @DuplicateInfo = CONCAT(
+            'Duplicate driver detected: RaceId = ', CAST(r.RaceId AS NVARCHAR(20)),
+            ', DriverId = ', CAST(r.DriverId AS NVARCHAR(20)),
+            ', Count = ', CAST(COUNT(1) AS NVARCHAR(20))
+        )
+    FROM Result r
+    INNER JOIN Race ra ON ra.RaceId = r.RaceId
+    WHERE ra.RaceYear >= 1979
+      AND r.RaceId IN (SELECT RaceId FROM inserted)
+      AND r.DriverId IN (SELECT DriverId FROM inserted)
+    GROUP BY r.RaceId, r.DriverId
+    HAVING COUNT(1) > 1;
+
+    IF @DuplicateInfo IS NOT NULL
+    BEGIN
+        THROW 50001, @DuplicateInfo, 1;
+    END
+END
+GO
+```
+
+### Stored Procedure
+
+De stored procedures `CreateResultProcedure` en `UpdateResultProcedure` controleren vooraf of de
+coureur al een resultaat heeft in dezelfde race (vanaf 1979).
+
+```sql
+CREATE OR ALTER PROCEDURE CreateResultProcedure(
+    @ResultId INT,
+    @RaceId INT,
+    @DriverId INT,
+    @ConstructorId INT = NULL,
+    @ResultNumber INT = NULL,
+    @Grid INT = NULL,
+    @Position INT = NULL,
+    @PositionText NVARCHAR(50) = NULL,
+    @PositionOrder INT = NULL,
+    @Points DECIMAL(18, 4) = NULL,
+    @Laps INT = NULL,
+    @Time NVARCHAR(50) = NULL,
+    @Milliseconds INT = NULL,
+    @FastestLap INT = NULL,
+    @Rank INT = NULL,
+    @FastestLapTime TIME = NULL,
+    @FastestLapSpeed DECIMAL(18, 4) = NULL,
+    @ResultStatusId INT = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @RaceYear INT = NULL
+
+    SELECT @RaceYear = Race.RaceYear
+    FROM Race
+    WHERE Race.RaceId = @RaceId
+
+    IF @RaceYear IS NULL
+        BEGIN
+            THROW 50001, 'Race does not exist', 1
+        END
+
+    IF @RaceYear >= 1979 AND EXISTS(SELECT 1
+                                    FROM Result
+                                    WHERE RaceId = @RaceId
+                                      AND DriverId = @DriverId)
+        BEGIN
+            THROW 50001, 'Driver already has a result in this race', 2
+        END
+
+    INSERT INTO Result (ResultId, RaceId, DriverId, ConstructorId, ResultNumber, Grid, Position, PositionText,
+                        PositionOrder, Points, Laps, Time, Milliseconds, FastestLap, Rank, FastestLapTime,
+                        FastestLapSpeed, ResultStatusId)
+    VALUES (@ResultId, @RaceId, @DriverId, @ConstructorId, @ResultNumber,
+            @Grid, @Position, @PositionText, @PositionOrder, @Points,
+            @Laps, @Time, @Milliseconds, @FastestLap, @Rank,
+            @FastestLapTime, @FastestLapSpeed, @ResultStatusId)
+END
+GO
+
+CREATE OR ALTER PROCEDURE UpdateResultProcedure(
+    @ResultId INT,
+    @RaceId INT,
+    @DriverId INT,
+    @ConstructorId INT = NULL,
+    @ResultNumber INT = NULL,
+    @Grid INT = NULL,
+    @Position INT = NULL,
+    @PositionText NVARCHAR(50) = NULL,
+    @PositionOrder INT = NULL,
+    @Points DECIMAL(18, 4) = NULL,
+    @Laps INT = NULL,
+    @Time NVARCHAR(50) = NULL,
+    @Milliseconds INT = NULL,
+    @FastestLap INT = NULL,
+    @Rank INT = NULL,
+    @FastestLapTime TIME = NULL,
+    @FastestLapSpeed DECIMAL(18, 4) = NULL,
+    @ResultStatusId INT = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @RaceYear INT = NULL;
+
+    SELECT @RaceYear = RaceYear
+    FROM Race
+    WHERE RaceId = @RaceId;
+
+    IF @RaceYear IS NULL
+        BEGIN
+            THROW 50001, 'Race does not exist', 1;
+        END
+
+    IF NOT EXISTS (SELECT 1 FROM Result WHERE ResultId = @ResultId)
+        BEGIN
+            THROW 50001, 'Result does not exist', 1;
+        END
+
+    IF @RaceYear >= 1979 AND EXISTS (SELECT 1
+                                     FROM Result
+                                     WHERE RaceId = @RaceId
+                                       AND DriverId = @DriverId
+                                       AND ResultId <> @ResultId)
+        BEGIN
+            THROW 50001, 'Driver already has a result in this race', 2;
+        END
+
+    UPDATE Result
+    SET RaceId          = @RaceId,
+        DriverId        = @DriverId,
+        ConstructorId   = @ConstructorId,
+        ResultNumber    = @ResultNumber,
+        Grid            = @Grid,
+        Position        = @Position,
+        PositionText    = @PositionText,
+        PositionOrder   = @PositionOrder,
+        Points          = @Points,
+        Laps            = @Laps,
+        Time            = @Time,
+        Milliseconds    = @Milliseconds,
+        FastestLap      = @FastestLap,
+        Rank            = @Rank,
+        FastestLapTime  = @FastestLapTime,
+        FastestLapSpeed = @FastestLapSpeed,
+        ResultStatusId  = @ResultStatusId
+    WHERE ResultId = @ResultId;
+END
+GO
+```
+
+### Voorkeur: AFTER Trigger
+
+Ook bij deze constraint gaat de voorkeur uit naar de AFTER trigger. Dezelfde redenering als
+bij constraint 1 geldt hier: de trigger garandeert data-integriteit ongeacht hoe de data de
+database binnenkomt. Bij een stored procedure bestaat het risico dat via een directe `INSERT` of
+`UPDATE` alsnog dubbele coureurs in een race terechtkomen. De trigger is de veiligste en meest
+robuuste oplossing.
+
+---
+
+## Constraint 3: Er is een maximum van 25 races per seizoen.
+
+### AFTER Trigger
+
+De trigger controleert bij `INSERT` of `UPDATE` op de `Race`-tabel of een seizoen niet meer dan
+25 races bevat.
+
+```sql
+CREATE OR ALTER TRIGGER TooManyRacesInSeason
+    ON Race
+    AFTER INSERT, UPDATE
+    AS
+BEGIN
+    DECLARE @OverflowInfo NVARCHAR(500);
+
+    SELECT TOP 1 @OverflowInfo = CONCAT('Season with more than 25 races detected: RaceYear = ',
+                                        CAST(Race.RaceYear AS NVARCHAR(4)))
+    FROM Race
+    WHERE Race.RaceYear IN (SELECT inserted.RaceYear FROM inserted)
+    GROUP BY Race.RaceYear
+    HAVING COUNT(1) > 25
+
+    IF @OverflowInfo IS NOT NULL
+        BEGIN
+            THROW 50001, @OverflowInfo, 1;
+        END
+END
+GO
+```
+
+### Stored Procedure
+
+De stored procedures `CreateRace` en `UpdateRace` controleren vooraf hoeveel races er al in het
+seizoen bestaan en blokkeren de operatie als het maximum van 25 wordt overschreden.
+
+```sql
+CREATE OR ALTER PROCEDURE CreateRace(
+    @RaceId INT,
+    @RaceYear INT,
+    @NrOfRound INT,
+    @CircuitId INT,
+    @RaceName NVARCHAR(150),
+    @RaceDate DATE,
+    @RaceStartTime TIME = NULL,
+    @RaceUrl NVARCHAR(150) = NULL,
+    @Practice1Date DATE = NULL,
+    @Practice1Time TIME = NULL,
+    @Practice2Date DATE = NULL,
+    @Practice2Time TIME = NULL,
+    @Practice3Date DATE = NULL,
+    @Practice3Time TIME = NULL,
+    @QualificationDate DATE = NULL,
+    @QualificationTime TIME = NULL,
+    @SprintRaceDate DATE= NULL,
+    @SprintRaceTime TIME = NULL
+)
+AS
+BEGIN
+    DECLARE @NoRaces INT;
+
+    SELECT @NoRaces = COUNT(1)
+    FROM Race
+    WHERE Race.RaceYear = @RaceYear
+
+    if @NoRaces > 24
+        BEGIN
+            THROW 50001, 'The number of races in the season will exceed 25 with the insertion of a new one.', 1
+        END
+
+    INSERT INTO Race(RaceId, RaceYear, NrOfRound, CircuitId, RaceName, RaceDate, RaceStartTime, RaceUrl,
+                     Practice1Date, Practice1Time, Practice2Date, Practice2Time, Practice3Date, Practice3Time,
+                     QualificationDate, QualificationTime, SprintRaceDate, SprintRaceTime)
+    VALUES (@RaceId, @RaceYear, @NrOfRound, @CircuitId, @RaceName,
+            @RaceDate, @RaceStartTime, @RaceUrl, @Practice1Date,
+            @Practice1Time, @Practice2Date, @Practice2Time,
+            @Practice3Date, @Practice3Time, @QualificationDate,
+            @QualificationTime, @SprintRaceDate, @SprintRaceTime);
+END
+GO
+
+CREATE OR ALTER PROCEDURE UpdateRace(
+    @RaceId INT,
+    @RaceYear INT,
+    @NrOfRound INT,
+    @CircuitId INT,
+    @RaceName NVARCHAR(150),
+    @RaceDate DATE,
+    @RaceStartTime TIME = NULL,
+    @RaceUrl NVARCHAR(150) = NULL,
+    @Practice1Date DATE = NULL,
+    @Practice1Time TIME = NULL,
+    @Practice2Date DATE = NULL,
+    @Practice2Time TIME = NULL,
+    @Practice3Date DATE = NULL,
+    @Practice3Time TIME = NULL,
+    @QualificationDate DATE = NULL,
+    @QualificationTime TIME = NULL,
+    @SprintRaceDate DATE= NULL,
+    @SprintRaceTime TIME = NULL
+)
+AS
+BEGIN
+    DECLARE @OriginalRaceYear INT
+
+    SELECT @OriginalRaceYear = Race.RaceYear
+    FROM Race
+    WHERE Race.RaceId = @RaceId
+
+    IF @OriginalRaceYear IS NULL
+        BEGIN
+            RETURN
+        END
+
+    if @OriginalRaceYear != @RaceYear
+        BEGIN
+            DECLARE @NoRaces INT;
+
+            SELECT @NoRaces = COUNT(1)
+            FROM Race
+            WHERE Race.RaceYear = @RaceYear
+
+            if @NoRaces > 24
+                BEGIN
+                    THROW 50001, 'The number of races in the season will exceed 25 with the addition of a new one.', 1
+                END
+        END
+
+    UPDATE Race
+    SET RaceYear          = @RaceYear,
+        NrOfRound         = @NrOfRound,
+        CircuitId         = @CircuitId,
+        RaceName          = @RaceName,
+        RaceDate          = @RaceDate,
+        RaceStartTime     = @RaceStartTime,
+        RaceUrl           = @RaceUrl,
+        Practice1Date     = @Practice1Date,
+        Practice1Time     = @Practice1Time,
+        Practice2Date     = @Practice2Date,
+        Practice2Time     = @Practice2Time,
+        Practice3Date     = @Practice3Date,
+        Practice3Time     = @Practice3Time,
+        QualificationDate = @QualificationDate,
+        QualificationTime = @QualificationTime,
+        SprintRaceDate    = @SprintRaceDate,
+        SprintRaceTime    = @SprintRaceTime
+    WHERE RaceId = @RaceId
+END
+GO
+```
+
+### Voorkeur: AFTER Trigger
+
+Bij deze constraint is de AFTER trigger opnieuw de beste keuze. Hoewel de stored procedure
+de controle netjes uitvoert, werkt deze alleen als iedereen de procedure gebruikt. Bij een
+directe `INSERT` op de `Race`-tabel, of bij het importeren van data via een bulkoperatie, wordt
+de constraint omzeild. De trigger is in dit geval robuuster omdat deze op databaseniveau
+garandeert dat de constraint onder alle omstandigheden wordt nageleefd. Zeker bij een harde
+limiet zoals maximaal 25 races per seizoen is het belangrijk dat deze niet onbedoeld omzeild
+kan worden.
+
+---
+
+## Constraint 4: Vanaf seizoen 2014 kan een startnummer per seizoen maar door één coureur worden gebruikt.
+
+### AFTER Trigger
+
+De trigger controleert bij `INSERT` of `UPDATE` op de `Result`-tabel of een startnummer niet door
+meerdere coureurs binnen hetzelfde seizoen wordt gebruikt, voor seizoenen vanaf 2014.
+
+```sql
+CREATE OR ALTER TRIGGER ResultNumberDriverTrigger
+    ON Result
+    AFTER INSERT, UPDATE
+    AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF EXISTS (SELECT 1
+               FROM inserted
+                        INNER JOIN Race ON Race.RaceId = inserted.RaceId
+                        INNER JOIN Result ON Result.ResultNumber = inserted.ResultNumber
+                   AND Result.DriverId <> inserted.DriverId
+                        INNER JOIN Race AS RaceResult ON RaceResult.RaceId = Result.RaceId
+                   AND RaceResult.RaceYear = Race.RaceYear
+               WHERE Race.RaceYear >= 2014
+                 AND inserted.ResultNumber IS NOT NULL)
+        BEGIN
+            THROW 50001, 'ResultNumber already used by another driver in this season', 1;
+        END
+END
+GO
+```
+
+### Stored Procedure
+
+De stored procedures `CreateResultProcedure` en `UpdateResultProcedure` controleren vooraf of het
+startnummer al in gebruik is bij een andere coureur binnen hetzelfde seizoen (vanaf 2014).
+
+```sql
+CREATE OR ALTER PROCEDURE CreateResultProcedure(
+    @ResultId INT,
+    @RaceId INT,
+    @DriverId INT,
+    @ConstructorId INT = NULL,
+    @ResultNumber INT = NULL,
+    @Grid INT = NULL,
+    @Position INT = NULL,
+    @PositionText NVARCHAR(50) = NULL,
+    @PositionOrder INT = NULL,
+    @Points DECIMAL(18, 4) = NULL,
+    @Laps INT = NULL,
+    @Time NVARCHAR(50) = NULL,
+    @Milliseconds INT = NULL,
+    @FastestLap INT = NULL,
+    @Rank INT = NULL,
+    @FastestLapTime TIME = NULL,
+    @FastestLapSpeed DECIMAL(18, 4) = NULL,
+    @ResultStatusId INT = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON
+
+    DECLARE @RaceYear INT = NULL
+
+    SELECT @RaceYear = Race.RaceYear
+    FROM Race
+    WHERE Race.RaceId = @RaceId
+
+    IF @RaceYear IS NULL
+        BEGIN
+            THROW 50001, 'Race does not exist', 1
+        END
+
+    IF @RaceYear >= 2014 AND @ResultNumber IS NOT NULL
+        AND EXISTS (SELECT 1
+                    FROM Result
+                             JOIN Race ON Result.RaceId = Race.RaceId
+                    WHERE Race.RaceYear = @RaceYear
+                      AND Result.ResultNumber = @ResultNumber
+                      AND Result.DriverId <> @DriverId)
+        BEGIN
+            THROW 50001, 'ResultNumber already used by another driver in this season', 2
+        END
+
+    INSERT INTO Result (ResultId, RaceId, DriverId, ConstructorId, ResultNumber, Grid, Position, PositionText,
+                        PositionOrder, Points, Laps, Time, Milliseconds, FastestLap, Rank, FastestLapTime,
+                        FastestLapSpeed, ResultStatusId)
+    VALUES (@ResultId, @RaceId, @DriverId, @ConstructorId, @ResultNumber,
+            @Grid, @Position, @PositionText, @PositionOrder, @Points,
+            @Laps, @Time, @Milliseconds, @FastestLap, @Rank,
+            @FastestLapTime, @FastestLapSpeed, @ResultStatusId)
+END
+GO
+
+CREATE OR ALTER PROCEDURE UpdateResultProcedure(
+    @ResultId INT,
+    @RaceId INT,
+    @DriverId INT,
+    @ConstructorId INT = NULL,
+    @ResultNumber INT = NULL,
+    @Grid INT = NULL,
+    @Position INT = NULL,
+    @PositionText NVARCHAR(50) = NULL,
+    @PositionOrder INT = NULL,
+    @Points DECIMAL(18, 4) = NULL,
+    @Laps INT = NULL,
+    @Time NVARCHAR(50) = NULL,
+    @Milliseconds INT = NULL,
+    @FastestLap INT = NULL,
+    @Rank INT = NULL,
+    @FastestLapTime TIME = NULL,
+    @FastestLapSpeed DECIMAL(18, 4) = NULL,
+    @ResultStatusId INT = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @RaceYear INT = NULL;
+
+    SELECT @RaceYear = RaceYear
+    FROM Race
+    WHERE RaceId = @RaceId;
+
+    IF @RaceYear IS NULL
+        BEGIN
+            THROW 50001, 'Race does not exist', 1;
+        END
+
+    IF NOT EXISTS (SELECT 1 FROM Result WHERE ResultId = @ResultId)
+        BEGIN
+            THROW 50001, 'Result does not exist', 1;
+        END
+
+    IF @RaceYear >= 2014 AND @ResultNumber IS NOT NULL
+        AND EXISTS (SELECT 1
+                    FROM Result
+                             JOIN Race ON Result.RaceId = Race.RaceId
+                    WHERE Race.RaceYear = @RaceYear
+                      AND Result.ResultNumber = @ResultNumber
+                      AND Result.DriverId <> @DriverId
+                      AND Result.ResultId <> @ResultId)
+        BEGIN
+            THROW 50001, 'ResultNumber already used by another driver in this season', 2;
+        END
+
+    UPDATE Result
+    SET RaceId          = @RaceId,
+        DriverId        = @DriverId,
+        ConstructorId   = @ConstructorId,
+        ResultNumber    = @ResultNumber,
+        Grid            = @Grid,
+        Position        = @Position,
+        PositionText    = @PositionText,
+        PositionOrder   = @PositionOrder,
+        Points          = @Points,
+        Laps            = @Laps,
+        Time            = @Time,
+        Milliseconds    = @Milliseconds,
+        FastestLap      = @FastestLap,
+        Rank            = @Rank,
+        FastestLapTime  = @FastestLapTime,
+        FastestLapSpeed = @FastestLapSpeed,
+        ResultStatusId  = @ResultStatusId
+    WHERE ResultId = @ResultId;
+END
+GO
+```
+
+### Voorkeur: AFTER Trigger
+
+Ook bij deze constraint gaat de voorkeur uit naar de AFTER trigger. De logica die controleert
+of een startnummer al door een andere coureur in hetzelfde seizoen wordt gebruikt, wordt bij de
+trigger automatisch en onvoorwaardelijk uitgevoerd. De stored procedure vereist dat elke
+toepassing de procedures `CreateResultProcedure` en `UpdateResultProcedure` gebruikt, wat in de
+praktijk niet te garanderen is. Data-integriteit weegt hier zwaarder dan de extra flexibiliteit
+van een stored procedure.
+
+---
+
+## Constraint 5: Kwalificatie-validatie
+
+Voor constraint 5 (per coureur geldt één van de volgende situaties: alleen Q1, Q1+Q2, of
+Q1+Q2+Q3) is het niet mogelijk gebleken om een werkende AFTER trigger of stored procedure te
+implementeren. De bestaande tabelstructuur biedt onvoldoende kolommen om de kwalificatiefases
+eenduidig te herleiden, waardoor deze constraint niet procedureel afgedwongen kan worden.
+
+---
+
+## Conclusie: Trigger vs. Stored Procedure
+
+Voor alle vier de uitvoerbare constraints is gekozen voor de AFTER trigger als primaire
+implementatie. De belangrijkste reden hiervoor is data-integriteit. Een trigger op
+databaseniveau wordt automatisch afgevuurd bij elke `INSERT` en `UPDATE`, ongeacht de bron van
+de wijziging. Dit betekent dat de constraint ook wordt gehandhaafd bij:
+
+- Directe SQL-queries buiten de stored procedures om
+- Bulk-imports van data
+- Wijzigingen vanuit applicatiecode die de stored procedures niet gebruikt
+- Ad-hoc handmatige correcties in de database
+
+Bij een stored procedure-oplossing rust de verantwoordelijkheid voor het afdwingen van de
+constraint bij elke individuele applicatie of gebruiker die data wijzigt. Zodra één partij zich
+niet aan deze afspraak houdt, kunnen er inconsistente data ontstaan. De trigger voorkomt dit
+risico volledig door de constraint op het laagst mogelijke niveau (de database zelf) te
+handhaven.
+
+De stored procedures zijn alsnog uitgewerkt als volwaardig alternatief. Ze tonen aan dat
+dezelfde validatielogica ook in een procedurele aanpak mogelijk is, maar de kans op menselijke
+fouten of omzeiling maakt deze aanpak minder geschikt voor het waarborgen van data-integriteit.
 
 # Indexeren (D)
 
