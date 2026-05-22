@@ -2314,6 +2314,21 @@ bevraging waarop deze index van toepassing is (op basis van de aanbevelingen van
 [2026-05-22 15:04:11] 410 rows retrieved starting from 1 in 335 ms (execution: 6 ms, fetching: 329 ms)
 ```
 
+Net als bij de andere toevoegingen van indexen, is het effect bij deze vergelijkbaar, de lookups in de `Result` tabel
+zijn van *Full Index Scan*'s naar *Index Scan*, *Index Seek* gegaan; echter, heeft dit niet bepaald geleid tot een
+betere executie. Het aantal logical reads is namelijk sterk toegenomen, zelfs al wordt er nu een betere *Index Seek*
+gebruikt. Dit omdat er toch enorm veel lookups gebeuren in *Nested Loop* structuren, en ook nog dubbel, op twee plekken.
+
+Zelfs al is de index dus effectief, heeft dit niet tot een betere oplossing geleid; Zelfs nog, deze is ensigns erger
+dan de oorspronkelijke wegens de toename in het aantal logical reads.
+
+Dit probleem is te verklaren door verkeerde, of out-dated statistieken; want het aantal rijen die de server verwachtte
+in de index seeks, is 1 terwijl er bijna 400 rijen ingeladen worden. Hierdoor maakt hij dus een verkeerde inschatting,
+waardoor het aantal reads dus juist toeneemt ten opzichte van de volledige scan.
+
+Al om al is de index effectief, maar zou deze query en de statistieken/ aanpak verder onderzocht moeten worden om te
+kijken hoe de server een beter executieplan kan bepalen.
+
 ##### Alternatieve implementatie
 
 ![Queryplan alternatieve implementatie post index](./assets/2-alternative-query-plan-post-index.png)
@@ -2330,3 +2345,23 @@ bevraging waarop deze index van toepassing is (op basis van de aanbevelingen van
 [2026-05-22 15:03:48] CPU time = 6 ms,  elapsed time = 5 ms.
 [2026-05-22 15:03:48] 410 rows retrieved starting from 1 in 329 ms (execution: 10 ms, fetching: 319 ms)
 ```
+
+Voor deze alternatieve aanpak, is het ook niet helemaal zo als het moet zijn. Er is wel duidelijk dat er gebruik
+gemaakt wordt van de index, maar het blijft nog steeds een *Full Index Scan*, alleen dan niet meer op de primary key,
+maar in plaats daarvan op de nieuwe index. Wel is er in de post-index statistieken te zien dat het aantal logical
+reads op de `Result` tabel gehalveerd is. Dit zou te verklaren zijn omdat er minder key-lookups plaats hoeven te vinden
+wegens de aanwezigheid van veel velden in de index zelf. Dus hierin is een enkele verbetering. Verder is er aan
+de executietijd ook weinig te merken, en vinden wij de optimalisatie niet zoals die moet zijn; er is verandering,
+maar niet in de richting die men zou willen.
+
+#### Verandering voorkeur met onderbouwing
+
+Hoewel de eerste twee indexen tot drastische verbeteringen hebben geleid, heeft deze laatste dat niet. Dit verbaasde
+ons ook niet heel erg, omdat deze ook redelijk ver gezocht was van SQL-server, zeker met het aantal velden dat ook
+meegenomen wordt in de index, wel interessant om de effecten hiervan te zien.
+
+Wij blijven verder wel bij onze vorige keuze, namelijk de alternatieve implementatie. Al zijn beide sub-optimaal,
+heeft de alternatieve implementatie wel de voorkeur dat het aantal reads veel lager ligt, al valt de impact van
+dat op zichzelf ook te betwisten, wegens de hogere CPU-tijd dan de primaire implementatie. Al om al, is dit een
+matige optimalisatie, met twee matige executieplannen, die je beiden eigenlijk liever niet hebt. Er zou dus nader
+onderzoek gedaan moeten worden om deze te verbeteren, de huidige aanpakken (primair en alternatief) volstaan niet.
