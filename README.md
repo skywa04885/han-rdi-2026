@@ -1730,7 +1730,11 @@ Tot slot bevat de primaire implementatie een expliciete *Sort*-operator voor de 
 
 ### Voorkeur
 
-De voorkeur gaat uit naar de alternatieve implementatie. Het belangrijkste bezwaar tegen de primaire variant is de *Full Index Scan* over de volledige Result-tabel, die de alternatieve implementatie met de `TOP 1 CROSS APPLY` weet te vermijden. Daarnaast is het gebruik van `ORDER BY RaceDate DESC` om de laatste race te bepalen robuuster dan `MAX(RaceId)`, omdat een RaceId niet gegarandeerd chronologisch oploopt. De alternatieve implementatie maakt daarmee beter onderbouwde aannames over de data, wat zich ook vertaalt in een lagere totale query cost.
+De voorkeur gaat uit naar de alternatieve implementatie. Het belangrijkste bezwaar tegen de primaire variant is de 
+*Full Index Scan* over de volledige Result-tabel, die de alternatieve implementatie met de `TOP 1 CROSS APPLY` weet te 
+vermijden. Daarnaast is het gebruik van `ORDER BY RaceDate DESC` om de laatste race te bepalen robuuster 
+dan `MAX(RaceId)`, omdat een RaceId niet gegarandeerd chronologisch oploopt. De alternatieve implementatie maakt 
+daarmee beter onderbouwde aannames over de data, wat zich ook vertaalt in een lagere totale query cost.
 
 # Indexeren (D)
 
@@ -2205,6 +2209,26 @@ de index op `DriverStanding` in deze situatie als effectief worden beschouwd.
 [2026-05-22 15:06:28] CPU time = 0 ms,  elapsed time = 0 ms.
 [2026-05-22 15:06:28] 20 rows retrieved starting from 1 in 328 ms (execution: 11 ms, fetching: 317 ms)
 ```
+
+Voor de alternatieve implementatie geld een vergelijkbare uitleg, ook hier is te zien hoe diverse *Full Index Scan*
+operators vervangen worden met betere *Index Scan* operators; waardoor het aantal rijen drastisch verminderd wordt,
+tegelijkertijd ook weer de kosten en tijd.
+
+Verder is ook bij deze implementatie wederom een enorme verbetering te zien in de IO en tijd statistieken. Het aantal
+logical reads is drastisch lager, het aantal scans gehalveerd en de CPU tijd enorm laag geworden. Ook bij deze
+implementatie is dus het effect van de index enorm duidelijk.
+
+#### Verandering voorkeur met onderbouwing
+
+Waarbij de oorspronkelijke voorkeur lag bij de alternatieve implementatie, die een *Full Index Scan* van de `Result`
+tabel wist te voorkomen (hierdoor gebruikte deze veel minder rijen dan de primaire implementatie), is de vergelijking
+nu wat moeilijker, beide hebben een fantastische performance, en komen ongeveer uit op ~200 logical reads in totaal,
+met een CPU tijd van zo goed als nul. Echter, is het primaire executieplan nu wel iets beter, hij heeft namelijk ~30
+logical reads minder, en bestaat uit een simpeler plan. Ook heeft het primaire plan een simpelere werking, door middel
+van joins en geen `CROSS APPLY`, wat het voor toekomstige ontwikkelaars ook makkelijker maakt.
+
+Met deze reden, is de voorkeur veranderd naar de primaire implementatie, deze is net iets mooier en simpeler (zowel in
+code als executieplan), het aantal logical reads ligt ook net iets lager.
 
 ### Index op `RaceId` en `FastestLapTime` van `Result`
 
