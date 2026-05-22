@@ -2096,6 +2096,18 @@ worden zijn als volgt: 4, 5, 6 en 7.
 [2026-05-22 14:13:08] 5 rows retrieved starting from 1 in 327 ms (execution: 5 ms, fetching: 322 ms)
 ```
 
+Het belangrijkste verschil dat zichtbaar is geworden, is dat er in plaats van *Full Index Scan*'s op de `Result` tabel
+nu normale *Index Scan* operators worden uitgevoerd, sterker nog, *Index Seek*'s. Deze verandering op zichzelf toont
+al aan dat de index effect heeft, want het aantal rijen dat bekeken wordt neemt drastisch af, ook de manier hoe deze
+benaderd worden is veel efficiënter, namelijk een seek.
+
+Deze verbetering is ook direct terug te zien in de IO en tijd-statistieken. De CPU-tijd is enorm afgenomen, en het 
+aantal logical reads van de result tabel is van ~650 afgenomen naar ~100, het *Scan Count* is daarbij wel toegenomen,
+maar dat zegt niet veel slechts, dit kan gewoon komen omdat het nu gaat over *Index Seeks*, die los worden uitgevoerd,
+deze kunnen opzichzelf heel erg snel zijn.
+
+Concluderend, aan zowel de statistieken als de queryplannen, wordt de index effectief gebruikt.
+
 ##### Alternatieve implementatie
 
 ![Queryplan alternatieve implementatie post index](./assets/1-alternative-query-plan-post-index.png)
@@ -2110,6 +2122,22 @@ worden zijn als volgt: 4, 5, 6 en 7.
 [2026-05-22 14:14:29] CPU time = 1 ms,  elapsed time = 1 ms.
 [2026-05-22 14:14:29] 5 rows retrieved starting from 1 in 321 ms (execution: 7 ms, fetching: 314 ms)
 ```
+
+Aan de alternatieve variant, is er in het executieplan eigenlijk niks veranderd, op de positie van de operator op de
+`Driver` tabel na; wel is ook hier een *Full Index Scan* veranderd naar een *Index Scan* met een *Index Seek*. Dit
+drukt het aantal rijen die worden bekeken enorm de kop in, en toont ook hier de effectiviteit van de index al aan.
+
+Het aantal logical reads is hier ook sterk afgenomen, van ~300 naar ~50, wat weer een enorme verbetering is.
+Verder is er aan de rest van de query vrij weinig veranderd, maar is de effectiviteit van de index wel sterk duidelijk.
+
+#### Verandering voorkeur met onderbouwing
+
+Voor het toepassen van deze index, lag onze voorkeur al op de primaire implementatie, wegens het niet gebruiken van
+spooling en het efficiënter uitlezen van data. Onze voorkeur blijft wederom hetzelfde, met een vergelijkbare 
+onderbouwing. De primaire implementatie gebruikt namelijk nog steeds geen spooling, terwijl de alternatieve dat
+nog steeds doet. Dit zorgt voor enorm veel logical reads in de `Worktable`, en daarbij ook veel geheugengebruik en
+mogelijke disk-IO.
+
 
 ### Index op `RaceId` van `DriverStanding`
 
@@ -2188,10 +2216,10 @@ zowel de `DriverStanding`- als de `Result`-tabel hebben een veel lager aantal *l
 aantal *physical reads* afgenomen. Hoewel dit aantal eerder al laag was, is het nu teruggebracht van enkele reads 
 naar nul.
 
-Wel is het belangrijk om te vermelden dat, door de aanwezigheid van een andere index op `DriverStanding`, de 
-optimalisatie niet uitsluitend wordt veroorzaakt door de index op `Result`. Omdat de lookup op `Result` echter
-aanzienlijk efficiënter verloopt, kan alsnog geconcludeerd worden dat deze index effectief is. Tegelijkertijd kan ook 
-de index op `DriverStanding` in deze situatie als effectief worden beschouwd.
+Wel is het belangrijk om te vermelden dat, door de aanwezigheid van een andere index op `Result`, de 
+optimalisatie niet uitsluitend wordt veroorzaakt door de index op `DriverStanding`. Omdat de lookup op `DriverStanding` 
+echter aanzienlijk efficiënter verloopt, kan alsnog geconcludeerd worden dat deze index effectief is. Tegelijkertijd 
+kan ook de index op `DriverStanding` in deze situatie als effectief worden beschouwd.
 
 
 ##### Alternatieve implementatie
