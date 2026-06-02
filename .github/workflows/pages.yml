@@ -20,31 +20,27 @@ jobs:
       - name: Prepare output folder
         run: mkdir -p public
 
-      - name: Create Pandoc defaults
+      - name: Install Eisvogel template
         run: |
-          cat << 'EOF' > pandoc-defaults.yaml
-          include-in-header:
-            - pandoc-header.tex
-          EOF
-
-          cat << 'EOF' > pandoc-header.tex
-          \makeatletter
-          \def\verbatim@nolig@list{\do\`\do\<\do\>\do\,\do\'\do\-}
-          \makeatother
-
-          \usepackage{graphicx}
-          \let\oldincludegraphics\includegraphics
-          \renewcommand{\includegraphics}[2][]{\par\oldincludegraphics[#1]{#2}\par}
-          EOF
+          mkdir -p ~/.local/share/pandoc/templates
+          curl -L \
+            https://github.com/Wandmalfarbe/pandoc-latex-template/releases/latest/download/Eisvogel.tar.gz \
+            -o eisvogel.tar.gz
+          tar -xzf eisvogel.tar.gz
+          cp eisvogel/eisvogel.latex ~/.local/share/pandoc/templates/
 
       - name: Render README.md to PDF
-        uses: docker://pandoc/latex:3.8
+        uses: docker://pandoc/extra:3.8
         with:
           args: >
             README.md
             -f gfm-implicit_figures
-            --defaults=pandoc-defaults.yaml
+            --template=eisvogel
+            --listings
             -V geometry:margin=0.5in
+            -V code-block-font-size=\scriptsize
+            -V listings-disable-line-numbers=true
+            -V titlepage=false
             -o public/index.pdf
 
       - name: Create redirect index.html
