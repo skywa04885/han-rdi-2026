@@ -29,12 +29,48 @@ jobs:
           tar -xzf eisvogel.tar.gz
           find . -name "eisvogel.latex" -exec cp {} ~/.local/share/pandoc/templates/eisvogel.latex \;
 
-      - name: Create image placement filter
+      - name: Create block image filter
         run: |
-          cat << 'EOF' > image-placement.lua
-          function Image(img)
-            img.attributes["placement"] = "H"
-            return img
+          cat << 'EOF' > block-images.lua
+          function Para(el)
+            if #el.content == 1 and el.content[1].t == "Image" then
+              el.content[1].attributes["placement"] = "H"
+              return el
+            end
+
+            local blocks = {}
+            local current = {}
+
+            for _, inline in ipairs(el.content) do
+              if inline.t == "Image" then
+                inline.attributes["placement"] = "H"
+
+                if #current > 0 then
+                  table.insert(blocks, pandoc.Para(current))
+                  current = {}
+                end
+
+                table.insert(blocks, pandoc.Para({inline}))
+              else
+                table.insert(current, inline)
+              end
+            end
+
+            if #current > 0 then
+              table.insert(blocks, pandoc.Para(current))
+            end
+
+            if #blocks > 1 then
+              return blocks
+            end
+
+            return el
+          end
+
+          function RawInline(el)
+            if el.format:match("html") and el.text:match("<img") then
+              return pandoc.RawInline("markdown", "\n\n" .. el.text .. "\n\n")
+            end
           end
           EOF
 
@@ -43,9 +79,9 @@ jobs:
         with:
           args: >
             README.md
-            -f markdown+implicit_figures
+            -f markdown+implicit_figures+raw_html
             --template=eisvogel
-            --lua-filter=image-placement.lua
+            --lua-filter=block-images.lua
             --listings
             -V geometry:margin=0.5in
             -V code-block-font-size=\scriptsize
