@@ -26,6 +26,7 @@ jobs:
           args: >
             README.md
             -f gfm
+            -V geometry:margin=0.5in
             -o public/index.pdf
 
       - name: Create redirect index.html
