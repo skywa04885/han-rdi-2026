@@ -50,7 +50,7 @@ ORDER BY MinCompletion.MinCompletion DESC;
 #### Resultaten
 
 | Name           | Completion |
-|----------------|------------|
+| -------------- | ---------- |
 | Oscar Piastri  | 100%       |
 | Oliver Bearman | 100%       |
 | Jack Doohan    | 98%        |
@@ -59,19 +59,19 @@ ORDER BY MinCompletion.MinCompletion DESC;
 
 #### Toelichting
 
-Deze query bepaalt per race in het seizoen 2024 hoeveel ronden er maximaal zijn gereden. 
-Dit maximum wordt gebruikt als benadering voor het totaal aantal ronden van die race. 
+Deze query bepaalt per race in het seizoen 2024 hoeveel ronden er maximaal zijn gereden.
+Dit maximum wordt gebruikt als benadering voor het totaal aantal ronden van die race.
 Daarna wordt per coureur opgehaald hoeveel ronden die coureur in elke race heeft gereden.
 
-Vervolgens berekent de query per coureur en per race het voltooiingspercentage door het aantal 
-gereden ronden van de coureur te delen door het maximale aantal ronden van die race. 
-Daarna wordt per coureur het laagste voltooiingspercentage over alle races bepaald. 
-Dit laagste percentage geeft dus aan hoe goed de coureur het slechtst gepresteerde 
+Vervolgens berekent de query per coureur en per race het voltooiingspercentage door het aantal
+gereden ronden van de coureur te delen door het maximale aantal ronden van die race.
+Daarna wordt per coureur het laagste voltooiingspercentage over alle races bepaald.
+Dit laagste percentage geeft dus aan hoe goed de coureur het slechtst gepresteerde
 raceweekend heeft voltooid.
 
-In de laatste stap worden alleen coureurs getoond waarvan dit minimum minimaal 90% is. 
-Daarmee blijven alleen coureurs over die in elke gereden race van 2024 ten minste 90% van 
-de raceafstand hebben afgelegd. De namen worden opgehaald uit de tabel Driver, en het 
+In de laatste stap worden alleen coureurs getoond waarvan dit minimum minimaal 90% is.
+Daarmee blijven alleen coureurs over die in elke gereden race van 2024 ten minste 90% van
+de raceafstand hebben afgelegd. De namen worden opgehaald uit de tabel Driver, en het
 percentage wordt afgerond en weergegeven als tekstwaarde.
 
 #### Query plan
@@ -122,7 +122,7 @@ ORDER BY DriverCompletion.MinCompletion DESC;
 #### Resultaten
 
 | Name           | Completion |
-|----------------|------------|
+| -------------- | ---------- |
 | Oscar Piastri  | 100%       |
 | Oliver Bearman | 100%       |
 | Jack Doohan    | 98%        |
@@ -131,17 +131,17 @@ ORDER BY DriverCompletion.MinCompletion DESC;
 
 #### Toelichting
 
-Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van eerst in een aparte 
-CTE het maximale aantal ronden per race te bepalen, gebruikt deze query een window function: 
-`MAX(Result.Laps) OVER (PARTITION BY Race.RaceId)`. Daarmee wordt per race direct het maximale 
+Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van eerst in een aparte
+CTE het maximale aantal ronden per race te bepalen, gebruikt deze query een window function:
+`MAX(Result.Laps) OVER (PARTITION BY Race.RaceId)`. Daarmee wordt per race direct het maximale
 aantal gereden ronden bepaald, zonder dat hiervoor een aparte aggregatie en join nodig is.
 
-Per resultaatregel wordt vervolgens berekend welk deel van de raceafstand de coureur heeft voltooid. 
-Daarna wordt per coureur opnieuw het laagste voltooiingspercentage over alle races bepaald met 
+Per resultaatregel wordt vervolgens berekend welk deel van de raceafstand de coureur heeft voltooid.
+Daarna wordt per coureur opnieuw het laagste voltooiingspercentage over alle races bepaald met
 `MIN(Completion)`. Dit minimum geeft aan wat de laagste racevoltooiing van de coureur in 2024 was.
 
-Tot slot filtert de query op coureurs met een minimale voltooiing van 90% of hoger. Het 
-eindresultaat is daardoor gelijk aan de primaire uitwerking, maar de query is korter doordat de 
+Tot slot filtert de query op coureurs met een minimale voltooiing van 90% of hoger. Het
+eindresultaat is daardoor gelijk aan de primaire uitwerking, maar de query is korter doordat de
 raceafstand via een window function binnen dezelfde tussenstap wordt berekend.
 
 #### Query plan
@@ -181,7 +181,7 @@ ORDER BY MIN(CAST(r.Laps AS FLOAT) / rml.MaxLaps) DESC;
 #### Resultaten
 
 | Name           | Completion |
-|----------------|------------|
+| -------------- | ---------- |
 | Oscar Piastri  | 100%       |
 | Oliver Bearman | 100%       |
 | Jack Doohan    | 98%        |
@@ -196,17 +196,23 @@ In tegenstelling tot de eerdere implementaties wordt de aggregatie volledig in d
 
 #### Query plan
 
+![Queryplan alternatieve implementatie](./assets/1-alternative-query2-plan.png)
+
 #### Aanbevolen indexen
+
+CREATE NONCLUSTERED INDEX [<Name of Missing Index, sysname,>]
+ON [dbo].[Result] ([RaceId])
+INCLUDE ([Laps])
 
 ### Vergelijking
 
 Hoewel beide query-plannen redelijk op elkaar lijken, is een van de eerste dingen die mij wel opvalt dat de alternatieve
-implementatie twee keer de Driver tabel raadpleegt, waarvan de eerste een *Index Scan* is en de tweede een *Index Seek*.
-De primaire implementatie daarentegen, voert enkel de laatste operation uit, namelijk de *Index Seek*. Dit is veel
+implementatie twee keer de Driver tabel raadpleegt, waarvan de eerste een _Index Scan_ is en de tweede een _Index Seek_.
+De primaire implementatie daarentegen, voert enkel de laatste operation uit, namelijk de _Index Seek_. Dit is veel
 efficiënter omdat enkel in het laatste stadium de relevante drivers op worden gehaald.
 
-Een van de andere dingen die opvalt, is dat de alternatieve implementatie veel *Spooling* heeft, namelijk 3 operators
-in totaal. Dit is op zich best logisch, want dit komt vaak voor als *Nested Loops* joins gebruikt worden, wat hier het 
+Een van de andere dingen die opvalt, is dat de alternatieve implementatie veel _Spooling_ heeft, namelijk 3 operators
+in totaal. Dit is op zich best logisch, want dit komt vaak voor als _Nested Loops_ joins gebruikt worden, wat hier het
 geval is; deze hebben namelijk als doel om te voorkomen dat data meerdere keren opnieuw wordt gelezen. Dit is helaas
 niet direct goed nieuws, want ze kunnen mogelijk veel extra geheugen gebruiken, en soms zelfs ook zorgen voor disk IO.
 In dit geval is dat niet zozeer zorgelijk, want de daadwerkelijke aantallen van rijen vallen best mee, maar nog steeds
@@ -214,14 +220,14 @@ heb je liever geen spooling.
 
 Buiten deze twee stukken om valt er niet enorm veel op aan de queries, andere operators als sorting en filtering
 zijn best vergelijkbaar, al bevinden ze zich op andere stukken in het plan. Deze voorgaande twee inzichten zijn dus
-de dingen die direct opvallen bij het vergelijken van deze twee query-plannen.
+de dingen die direct opvallen bij het vergelijken van deze twee query-plannen. De derde variant (Alternatieve Uitwerking 2) gebruikt een derived table met GROUP BY en HAVING, wat compacter is maar dezelfde spooling-problematiek kent als de eerste alternatieve uitwerking.
 
 ### Voorkeur
 
-Gezien het feit dat de primaire implementatie de Driver tabel efficiënter raadpleegt, en daarnaast geen spooling 
+Gezien het feit dat de primaire implementatie de Driver tabel efficiënter raadpleegt, en daarnaast geen spooling
 gebruikt, heeft deze onze voorkeur. Ook als we naar stijl kijken, heeft de primaire de voorkeur, deze breekt het
 proces namelijk op in duidelijkere stappen, in plaats van het proberen samen te voegen van meerdere stappen; wel moet
-er nog worden opgemerkt dat de tweede wel compacter is, wat voor sommige de voorkeur kan hebben.
+er nog worden opgemerkt dat de alternatieve uitwerkingen wel compacter zijn, wat voor sommige de voorkeur kan hebben.
 
 ## Van 2004 tot en met 2024: per race de snelste ronde met circuit, racedatum, coureur, rondenummer, rondetijd, positie, punten, totaal aantal rondes en resultstatus; gesorteerd op circuit en daarna op rondetijd.
 
@@ -261,7 +267,7 @@ ORDER BY CircuitName, FastestLapTime;
 #### Resultaten
 
 | CircuitName                    | RaceDate   | Name               | FastestLap | FastestLapTime   | Position | Points  | Laps | ResultStatus |
-|--------------------------------|------------|--------------------|------------|------------------|----------|---------|------|--------------|
+| ------------------------------ | ---------- | ------------------ | ---------- | ---------------- | -------- | ------- | ---- | ------------ |
 | Albert Park Grand Prix Circuit | 2024-03-24 | Charles Leclerc    | 56         | 00:01:19.8130000 | 2        | 19.0000 | 58   | Finished     |
 | Albert Park Grand Prix Circuit | 2023-04-02 | Sergio Pérez       | 53         | 00:01:20.2350000 | 5        | 11.0000 | 58   | Finished     |
 | Albert Park Grand Prix Circuit | 2022-04-10 | Charles Leclerc    | 58         | 00:01:20.2600000 | 1        | 26.0000 | 58   | Finished     |
@@ -278,19 +284,19 @@ ORDER BY CircuitName, FastestLapTime;
 | Albert Park Grand Prix Circuit | 2011-03-27 | Felipe Massa       | 55         | 00:01:28.9470000 | 7        | 6.0000  | 58   | Finished     |
 | Albert Park Grand Prix Circuit | 2016-03-20 | Daniel Ricciardo   | 49         | 00:01:28.9970000 | 4        | 12.0000 | 57   | Finished     |
 | Albert Park Grand Prix Circuit | 2012-03-18 | Jenson Button      | 56         | 00:01:29.1870000 | 1        | 25.0000 | 58   | Finished     |
-| ...                            | ...        | ...                | ...        | ...              | ...      | ...     | ...  | ...          | 
+| ...                            | ...        | ...                | ...        | ...              | ...      | ...     | ...  | ...          |
 
 #### Toelichting
 
-Deze query zoekt per race tussen 2004 en 2024 de snelste rondetijd. In de CTE FastestRaceResult wordt voor elke race 
-met een subquery het ResultId opgehaald van het resultaat met de laagste FastestLapTime. Resultaten zonder snelste 
+Deze query zoekt per race tussen 2004 en 2024 de snelste rondetijd. In de CTE FastestRaceResult wordt voor elke race
+met een subquery het ResultId opgehaald van het resultaat met de laagste FastestLapTime. Resultaten zonder snelste
 rondetijd worden hierbij uitgesloten.
 
-Daarna wordt dit snelste resultaat gekoppeld aan de tabellen Race, Driver, Circuit en ResultStatus. Hierdoor kan de 
-query naast de snelste rondetijd ook extra informatie tonen, zoals het circuit, de racedatum, de coureur, het 
+Daarna wordt dit snelste resultaat gekoppeld aan de tabellen Race, Driver, Circuit en ResultStatus. Hierdoor kan de
+query naast de snelste rondetijd ook extra informatie tonen, zoals het circuit, de racedatum, de coureur, het
 rondenummer, de eindpositie, punten, het totaal aantal gereden rondes en de resultstatus.
 
-Tot slot wordt het resultaat gesorteerd op circuitnaam en daarna op rondetijd. Daardoor staan de snelste rondes per 
+Tot slot wordt het resultaat gesorteerd op circuitnaam en daarna op rondetijd. Daardoor staan de snelste rondes per
 circuit gegroepeerd, met binnen elk circuit de snelste tijden bovenaan.
 
 #### Query plan
@@ -348,7 +354,7 @@ ORDER BY CircuitName, FastestLapTime;
 #### Resultaten
 
 | CircuitName                    | RaceDate   | Name               | FastestLap | FastestLapTime   | Position | Points  | Laps | ResultStatus |
-|--------------------------------|------------|--------------------|------------|------------------|----------|---------|------|--------------|
+| ------------------------------ | ---------- | ------------------ | ---------- | ---------------- | -------- | ------- | ---- | ------------ |
 | Albert Park Grand Prix Circuit | 2024-03-24 | Charles Leclerc    | 56         | 00:01:19.8130000 | 2        | 19.0000 | 58   | Finished     |
 | Albert Park Grand Prix Circuit | 2023-04-02 | Sergio Pérez       | 53         | 00:01:20.2350000 | 5        | 11.0000 | 58   | Finished     |
 | Albert Park Grand Prix Circuit | 2022-04-10 | Charles Leclerc    | 58         | 00:01:20.2600000 | 1        | 26.0000 | 58   | Finished     |
@@ -365,19 +371,19 @@ ORDER BY CircuitName, FastestLapTime;
 | Albert Park Grand Prix Circuit | 2011-03-27 | Felipe Massa       | 55         | 00:01:28.9470000 | 7        | 6.0000  | 58   | Finished     |
 | Albert Park Grand Prix Circuit | 2016-03-20 | Daniel Ricciardo   | 49         | 00:01:28.9970000 | 4        | 12.0000 | 57   | Finished     |
 | Albert Park Grand Prix Circuit | 2012-03-18 | Jenson Button      | 56         | 00:01:29.1870000 | 1        | 25.0000 | 58   | Finished     |
-| ...                            | ...        | ...                | ...        | ...              | ...      | ...     | ...  | ...          | 
+| ...                            | ...        | ...                | ...        | ...              | ...      | ...     | ...  | ...          |
 
 #### Toelichting
 
-Deze alternatieve query gebruikt een window function om per race de snelste ronde te bepalen. In de CTE RankedResults 
+Deze alternatieve query gebruikt een window function om per race de snelste ronde te bepalen. In de CTE RankedResults
 krijgen alle resultaten met een ingevulde FastestLapTime een rangnummer per race via `ROW_NUMBER() OVER (PARTITION 
 BY r.RaceId ORDER BY res.FastestLapTime)`. Het resultaat met rangnummer 1 is dus de snelste ronde van die race.
 
-In de hoofdquery worden alleen de regels met rn = 1 geselecteerd. Daarna worden deze gekoppeld aan de tabellen Race, 
+In de hoofdquery worden alleen de regels met rn = 1 geselecteerd. Daarna worden deze gekoppeld aan de tabellen Race,
 Driver, Circuit en ResultStatus, zodat alle gevraagde gegevens kunnen worden weergegeven.
 
-Deze aanpak levert hetzelfde resultaat op als de primaire uitwerking, maar is vaak overzichtelijker omdat de 
-selectie van de snelste ronde expliciet via rangschikking gebeurt. Ook sluit deze vorm goed aan op de aanbevolen 
+Deze aanpak levert hetzelfde resultaat op als de primaire uitwerking, maar is vaak overzichtelijker omdat de
+selectie van de snelste ronde expliciet via rangschikking gebeurt. Ook sluit deze vorm goed aan op de aanbevolen
 indexen, omdat er per race wordt geordend op FastestLapTime.
 
 #### Query plan
@@ -430,7 +436,7 @@ ORDER BY CircuitName, FastestLapTime;
 #### Resultaten
 
 | CircuitName                    | RaceDate   | Name               | FastestLap | FastestLapTime   | Position | Points  | Laps | ResultStatus |
-|--------------------------------|------------|--------------------|------------|------------------|----------|---------|------|--------------|
+| ------------------------------ | ---------- | ------------------ | ---------- | ---------------- | -------- | ------- | ---- | ------------ |
 | Albert Park Grand Prix Circuit | 2024-03-24 | Charles Leclerc    | 56         | 00:01:19.8130000 | 2        | 19.0000 | 58   | Finished     |
 | Albert Park Grand Prix Circuit | 2023-04-02 | Sergio Perez       | 53         | 00:01:20.2350000 | 5        | 11.0000 | 58   | Finished     |
 | Albert Park Grand Prix Circuit | 2022-04-10 | Charles Leclerc    | 58         | 00:01:20.2600000 | 1        | 26.0000 | 58   | Finished     |
@@ -445,7 +451,13 @@ Deze aanpak is compacter dan de primaire implementatie (geen geneste subquery pe
 
 #### Query plan
 
+![Queryplan alternatieve implementatie](./assets/2-alternative-query2-plan.png)
+
 #### Aanbevolen indexen
+
+CREATE NONCLUSTERED INDEX [<Name of Missing Index, sysname,>]
+ON [dbo].[Result] ([FastestLapTime])
+INCLUDE ([RaceId])
 
 ### Vergelijking
 
@@ -455,20 +467,20 @@ rijen niet heel significant, ook al was het wel iets waar op gelet moest worden.
 een enorm groot aantal rijen, namelijk bijna 9000. Dit kan erg veel geheugen kosten, en veel IO als het op
 de disk opgeslagen wordt. Dit is dus al eigenlijk iets dat wij niet willen zien.
 
-Verder wordt er in de primaire implementatie veel gebruik gemaakt van *Nested Loops*, die ieder best een
-grote cost hebben. De alternatieve implementatie maakt in contrast gebruik van normale *Hash Joins*, die veel
-lagere kosten hebben, en ook beter zijn voor de performance in grote aantallen. De *Merge Join* van de
+Verder wordt er in de primaire implementatie veel gebruik gemaakt van _Nested Loops_, die ieder best een
+grote cost hebben. De alternatieve implementatie maakt in contrast gebruik van normale _Hash Joins_, die veel
+lagere kosten hebben, en ook beter zijn voor de performance in grote aantallen. De _Merge Join_ van de
 primaire implementatie is daarintegen niet zorgwekkend, deze operation wordt direct gebaseerd op de inhoud
 van de clustered index, die al gesorteerd is, waardoor geen dure sort-operation nodig is.
 
-Een ander iets dat opvalt is dat de primaire implementatie meer *Full Index Scan* operators gebruikt
+Een ander iets dat opvalt is dat de primaire implementatie meer _Full Index Scan_ operators gebruikt
 dan de alternatieve implementatie, waarbij zowel de Race als Result tabellen twee keer worden raadgepleegd.
-De alternatieve implementatie doet dit minder, met enkel de Race die twee keer wordt raadgepleegd.
+De alternatieve implementatie doet dit minder, met enkel de Race die twee keer wordt raadgepleegd. De derde variant (Alternatieve Uitwerking 2) gebruikt een GROUP BY met MIN() en koppelt terug op FastestLapTime, wat het risico op dubbele rijen introduceert bij gelijke tijden, maar in de praktijk zelden problematisch is.
 
 ### Voorkeur
 
 De voorkeur van ons is zoals te verwachten, voor de alternatieve implementatie. Deze maakt gebruik van snelle
-en goedkope *Hash Join* operators, raadpleegt indexen minder vaak (minder IO) en heeft geen *Spooling* operators. Daarnaast is het queryplan van de alternatieve implementatie veel simpeler, en is de cost/
+en goedkope _Hash Join_ operators, raadpleegt indexen minder vaak (minder IO) en heeft geen _Spooling_ operators. Daarnaast is het queryplan van de alternatieve implementatie veel simpeler, en is de cost/
 executietijd lager. Kijkend naar de code-style, is hierbij niet echt een voorkeur te benoemen, beide queries
 zijn van vergelijkbare leesbaarheid en complexiteit.
 
@@ -547,7 +559,7 @@ ORDER BY SeasonWinner.RaceYear;
 #### Resultaten
 
 | Seizoen | Kampioen       | RaceWins | TotaalRaces | LeiderVanaf | Volgnummer | Race                  |
-|---------|----------------|----------|-------------|-------------|------------|-----------------------|
+| ------- | -------------- | -------- | ----------- | ----------- | ---------- | --------------------- |
 | 2015    | Lewis Hamilton | 10       | 19          | 2015-03-15  | 1          | Australian Grand Prix |
 | 2016    | Nico Rosberg   | 9        | 21          | 2016-09-18  | 15         | Singapore Grand Prix  |
 | 2017    | Lewis Hamilton | 9        | 20          | 2017-09-03  | 13         | Italian Grand Prix    |
@@ -561,16 +573,16 @@ ORDER BY SeasonWinner.RaceYear;
 
 #### Toelichting
 
-Deze query bepaalt per seizoen tussen 2015 en 2024 wie aan het einde van het seizoen bovenaan stond in de 
-coureursstand. Dit gebeurt in SeasonWinner, waar per seizoen wordt gekeken naar de laatste race van dat jaar en de 
+Deze query bepaalt per seizoen tussen 2015 en 2024 wie aan het einde van het seizoen bovenaan stond in de
+coureursstand. Dit gebeurt in SeasonWinner, waar per seizoen wordt gekeken naar de laatste race van dat jaar en de
 coureur met positie 1 in de stand.
 
-Daarna wordt voor deze kampioen per race opgehaald welke positie hij na elke race in de stand had. Met FirstUnbrokenP1 
-wordt bepaald vanaf welk moment de kampioen op positie 1 stond en daarna niet meer van die eerste plek is afgeweken. 
+Daarna wordt voor deze kampioen per race opgehaald welke positie hij na elke race in de stand had. Met FirstUnbrokenP1
+wordt bepaald vanaf welk moment de kampioen op positie 1 stond en daarna niet meer van die eerste plek is afgeweken.
 Dit gebeurt door te zoeken naar de eerste race ná de laatste keer dat de kampioen lager dan eerste stond.
 
-Daarnaast berekent de query het totaal aantal races in het seizoen en het aantal races dat de kampioen daadwerkelijk 
-heeft gewonnen. In het eindresultaat worden deze gegevens gecombineerd met de datum, het volgnummer en de naam van de 
+Daarnaast berekent de query het totaal aantal races in het seizoen en het aantal races dat de kampioen daadwerkelijk
+heeft gewonnen. In het eindresultaat worden deze gegevens gecombineerd met de datum, het volgnummer en de naam van de
 race vanaf waar de kampioen de leiding definitief behield.
 
 #### Query plan
@@ -639,7 +651,7 @@ ORDER BY SeasonWinner.RaceYear;
 #### Resultaten
 
 | Seizoen | Kampioen       | RaceWins | TotaalRaces | LeiderVanaf | Volgnummer | Race                  |
-|---------|----------------|----------|-------------|-------------|------------|-----------------------|
+| ------- | -------------- | -------- | ----------- | ----------- | ---------- | --------------------- |
 | 2015    | Lewis Hamilton | 10       | 19          | 2015-03-15  | 1          | Australian Grand Prix |
 | 2016    | Nico Rosberg   | 9        | 21          | 2016-09-18  | 15         | Singapore Grand Prix  |
 | 2017    | Lewis Hamilton | 9        | 20          | 2017-09-03  | 13         | Italian Grand Prix    |
@@ -653,16 +665,16 @@ ORDER BY SeasonWinner.RaceYear;
 
 #### Toelichting
 
-Deze alternatieve query bepaalt eerst op dezelfde manier de seizoenswinnaar: de coureur die na de laatste race van elk 
+Deze alternatieve query bepaalt eerst op dezelfde manier de seizoenswinnaar: de coureur die na de laatste race van elk
 seizoen tussen 2015 en 2024 bovenaan stond in de coureursstand.
 
-Daarna gebruikt de query meerdere `CROSS APPLY`-blokken om per kampioen direct aanvullende informatie op te halen. 
-Het eerste blok telt het totaal aantal races in dat seizoen. Het tweede blok telt hoeveel races de kampioen in dat 
-seizoen heeft gewonnen. Het derde blok zoekt de eerste race waarin de kampioen op positie 1 stond, zonder dat er 
+Daarna gebruikt de query meerdere `CROSS APPLY`-blokken om per kampioen direct aanvullende informatie op te halen.
+Het eerste blok telt het totaal aantal races in dat seizoen. Het tweede blok telt hoeveel races de kampioen in dat
+seizoen heeft gewonnen. Het derde blok zoekt de eerste race waarin de kampioen op positie 1 stond, zonder dat er
 daarna nog een race volgde waarin hij lager dan eerste stond.
 
-De `NOT EXISTS`-voorwaarde controleert dus of de gekozen race echt het beginpunt is van de onafgebroken periode aan de 
-leiding. Het resultaat toont per seizoen de kampioen, zijn aantal overwinningen, het totaal aantal races en de race 
+De `NOT EXISTS`-voorwaarde controleert dus of de gekozen race echt het beginpunt is van de onafgebroken periode aan de
+leiding. Het resultaat toont per seizoen de kampioen, zijn aantal overwinningen, het totaal aantal races en de race
 vanaf waar hij de eerste plaats tot het einde vasthield.
 
 #### Query plan
@@ -742,7 +754,7 @@ ORDER BY SeasonWinner.RaceYear;
 #### Resultaten
 
 | Seizoen | Kampioen       | RaceWins | TotaalRaces | LeiderVanaf | Volgnummer | Race                  |
-|---------|----------------|----------|-------------|-------------|------------|-----------------------|
+| ------- | -------------- | -------- | ----------- | ----------- | ---------- | --------------------- |
 | 2015    | Lewis Hamilton | 10       | 19          | 2015-03-15  | 1          | Australian Grand Prix |
 | 2016    | Nico Rosberg   | 9        | 21          | 2016-09-18  | 15         | Singapore Grand Prix  |
 | 2017    | Lewis Hamilton | 9        | 20          | 2017-09-03  | 13         | Italian Grand Prix    |
@@ -762,7 +774,12 @@ De bepaling van de eerste onafgebroken leidingspositie is anders opgezet: `LastN
 
 #### Query plan
 
+![Queryplan alternatieve implementatie](./assets/3-alternative-query2-plan-part1.png)
+![Queryplan alternatieve implementatie](./assets/3-alternative-query2-plan-part2.png)
+
 #### Aanbevolen indexen
+
+Het execution plan bevatte geen missing-index suggesties.
 
 ### Vergelijking
 
@@ -774,7 +791,7 @@ Verder valt op dat de primaire implementatie meer gebruikmaakt van Sort-operator
 
 Een ander belangrijk verschil is zichtbaar in de manier waarop met datasets wordt omgegaan. In de primaire implementatie wordt lange tijd gewerkt met relatief grote datasets, waarbij filtering pas in latere stadia van het queryplan plaatsvindt. Dit resulteert in grotere tussenresultaten en dus hogere kosten voor vervolgoperaties. De alternatieve implementatie daarentegen reduceert de dataset al in een vroeg stadium, met name door efficiëntere join-operaties. Hierdoor worden latere stappen uitgevoerd op een aanzienlijk kleinere dataset, wat de performance ten goede komt.
 
-Tot slot scoort de alternatieve implementatie beter op het gebied van leesbaarheid en onderhoudbaarheid. De query is compacter en minder complex, wat zich direct vertaalt naar een overzichtelijker queryplan. Dit bevestigt dat een minder complexe query doorgaans leidt tot een efficiënter en beter te onderhouden uitvoeringsplan.
+Tot slot scoort de alternatieve implementatie beter op het gebied van leesbaarheid en onderhoudbaarheid. De query is compacter en minder complex, wat zich direct vertaalt naar een overzichtelijker queryplan. Dit bevestigt dat een minder complexe query doorgaans leidt tot een efficiënter en beter te onderhouden uitvoeringsplan. De derde variant (Alternatieve Uitwerking 2) combineert elementen van beide met zijn gemengde CTE- en window function-aanpak, maar voegt daarmee geen wezenlijk voordeel toe ten opzichte van de eerste alternatieve uitwerking.
 
 ### Voorkeur
 
@@ -847,7 +864,7 @@ GROUP BY DriverYearRange.DriverId;
 #### Resultaten
 
 | Coureur         | Periodes                   |
-|-----------------|----------------------------|
+| --------------- | -------------------------- |
 | Adolf Brudes    | 1952                       |
 | Adolfo Cruz     | 1953                       |
 | Adrián Campos   | 1987-1988                  |
@@ -868,20 +885,20 @@ GROUP BY DriverYearRange.DriverId;
 
 #### Toelichting
 
-Deze query gebruikt de view DriverYearRanges om per coureur te tonen in welke seizoenen hij heeft deelgenomen aan 
-Formule 1-races. De hoofdquery zelf blijft daardoor eenvoudig: de coureurs worden gekoppeld aan de view en 
+Deze query gebruikt de view DriverYearRanges om per coureur te tonen in welke seizoenen hij heeft deelgenomen aan
+Formule 1-races. De hoofdquery zelf blijft daardoor eenvoudig: de coureurs worden gekoppeld aan de view en
 alfabetisch gesorteerd op naam.
 
-De complexiteit zit vooral in de view. Eerst wordt per coureur bepaald in welke unieke jaren hij aan races heeft 
-meegedaan. Daarna wordt met LAG() gekeken of een jaar direct aansluit op het vorige deelnamejaar van dezelfde coureur. 
+De complexiteit zit vooral in de view. Eerst wordt per coureur bepaald in welke unieke jaren hij aan races heeft
+meegedaan. Daarna wordt met LAG() gekeken of een jaar direct aansluit op het vorige deelnamejaar van dezelfde coureur.
 Als dat niet zo is, betekent dit dat er een onderbreking is geweest en dat er een nieuwe periode moet beginnen.
 
-Vervolgens worden deze opeenvolgende jaren gegroepeerd. Per groep wordt het eerste en laatste jaar bepaald. Als een 
-groep maar uit één jaar bestaat, wordt alleen dat jaartal getoond. Als een groep meerdere opeenvolgende jaren bevat, 
+Vervolgens worden deze opeenvolgende jaren gegroepeerd. Per groep wordt het eerste en laatste jaar bepaald. Als een
+groep maar uit één jaar bestaat, wordt alleen dat jaartal getoond. Als een groep meerdere opeenvolgende jaren bevat,
 wordt dit weergegeven als periode, bijvoorbeeld 2007-2011.
 
-Tot slot worden alle periodes van dezelfde coureur samengevoegd met STRING_AGG. Hierdoor ontstaat per coureur één 
-overzicht met alle deelnameperiodes in chronologische volgorde. De view is apart aangemaakt omdat dezelfde 
+Tot slot worden alle periodes van dezelfde coureur samengevoegd met STRING_AGG. Hierdoor ontstaat per coureur één
+overzicht met alle deelnameperiodes in chronologische volgorde. De view is apart aangemaakt omdat dezelfde
 periode-indeling ook in latere queries opnieuw gebruikt kan worden.
 
 #### Query plan
@@ -911,18 +928,18 @@ ORDER BY Coureur;
 
 #### Resultaten
 
-| Coureur         | Periodes                   |
-|-----------------|----------------------------|
-| Adrian Sutil    | 2007-2011, 2013-2014       |
-| Al Herman       | 1955-1957, 1959-1960       |
-| Al Pease        | 1967, 1969                 |
-| Alain Prost     | 1980-1991, 1993            |
-| Alan Jones      | 1975-1981, 1983, 1985-1986 |
-| Fernando Alonso | 2001, 2003-2018, 2021-2024 |
-| Michael Schumacher | 1991-2006, 2010-2012    |
-| Niki Lauda      | 1971-1979, 1982-1985       |
-| Nigel Mansell   | 1980-1992, 1994-1995       |
-| ...             | ...                        |
+| Coureur            | Periodes                   |
+| ------------------ | -------------------------- |
+| Adrian Sutil       | 2007-2011, 2013-2014       |
+| Al Herman          | 1955-1957, 1959-1960       |
+| Al Pease           | 1967, 1969                 |
+| Alain Prost        | 1980-1991, 1993            |
+| Alan Jones         | 1975-1981, 1983, 1985-1986 |
+| Fernando Alonso    | 2001, 2003-2018, 2021-2024 |
+| Michael Schumacher | 1991-2006, 2010-2012       |
+| Niki Lauda         | 1971-1979, 1982-1985       |
+| Nigel Mansell      | 1980-1992, 1994-1995       |
+| ...                | ...                        |
 
 #### Toelichting
 
@@ -932,7 +949,23 @@ De primaire uitwerking toont álle coureurs, inclusief degenen die één aaneeng
 
 #### Query plan
 
+![Queryplan alternatieve implementatie](./assets/4-alternative-query-plan.png)
+
 #### Aanbevolen indexen
+
+Het execution plan bevatte geen missing-index suggesties.
+
+### Vergelijking
+
+Beide uitwerkingen maken gebruik van dezelfde view DriverYearRanges. Het verschil tussen de primaire en de alternatieve implementatie is minimaal: de alternatieve uitwerking voegt een `WHERE`-clausule toe die alleen coureurs met een komma in hun periodes selecteert (`LIKE '%,%'`), oftewel coureurs met minimaal twee afzonderlijke deelnameperiodes. De primaire uitwerking toont het volledige overzicht van alle coureurs.
+
+Qua performance is het verschil verwaarloosbaar, aangezien beide queries eenvoudige SELECT-statements zijn op dezelfde view. De extra `WHERE`-clausule in de alternatieve uitwerking zorgt hooguit voor een minimale filterstap.
+
+De derde variant is hier niet van toepassing, aangezien de vraag zich richt op het filteren van de view-output en niet op een alternatieve manier van aggregeren.
+
+### Voorkeur
+
+De voorkeur gaat uit naar de alternatieve implementatie. Deze beantwoordt de vraag direct: "Welke coureurs hebben een periode niet deelgenomen en zijn later teruggekeerd?" De `WHERE`-clausule filtert exact de coureurs die aan dit criterium voldoen. De primaire uitwerking toont ook coureurs met een ononderbroken carrière en geeft daarmee meer informatie dan gevraagd.
 
 ## Maak een overzicht van alle F1 coureurs die in hun volledige carrière 25 of meer wedstrijden hebben gewonnen. Toon per coureur zijn naam, in één veld een overzicht van de seizoenen waarin hij gereden heeft (ontbrekende jaren weglaten), het aantal races dat hij gestart is, het aantal races die hij gewonnen heeft en het percentage van het aantal races die hij gewonnen heeft ten opzichte van het aantal races dat hij gestart is. Een voorbeeld van hoe het er voor Michael Schumacher en Ayrton Senna uitziet, zie je hieronder.
 
@@ -970,7 +1003,7 @@ ORDER BY DriverWin.Wins DESC;
 #### Resultaten
 
 | Driver             | Seasons                    | Entries | Wins | Percentage |
-|--------------------|----------------------------|---------|------|------------|
+| ------------------ | -------------------------- | ------- | ---- | ---------- |
 | Lewis Hamilton     | 2007-2024                  | 356     | 105  | 29.49%     |
 | Michael Schumacher | 1991-2006, 2010-2012       | 308     | 91   | 29.55%     |
 | Max Verstappen     | 2015-2024                  | 209     | 63   | 30.14%     |
@@ -985,16 +1018,16 @@ ORDER BY DriverWin.Wins DESC;
 
 #### Toelichting
 
-Deze query maakt een overzicht van coureurs die in hun volledige carrière minimaal 25 races hebben gewonnen. 
-Eerst wordt in DriverEntry per coureur geteld aan hoeveel races hij heeft deelgenomen. Daarna wordt in DriverWin 
+Deze query maakt een overzicht van coureurs die in hun volledige carrière minimaal 25 races hebben gewonnen.
+Eerst wordt in DriverEntry per coureur geteld aan hoeveel races hij heeft deelgenomen. Daarna wordt in DriverWin
 per coureur geteld hoeveel van deze races hij heeft gewonnen, waarbij alleen resultaten met `Position = 1` meetellen.
 
-In de hoofdquery worden deze tellingen gekoppeld aan de tabel Driver, zodat de naam van de coureur getoond kan worden. 
-Ook wordt de view DriverYearRanges gebruikt om de seizoenen waarin de coureur actief was als één overzicht te tonen. 
+In de hoofdquery worden deze tellingen gekoppeld aan de tabel Driver, zodat de naam van de coureur getoond kan worden.
+Ook wordt de view DriverYearRanges gebruikt om de seizoenen waarin de coureur actief was als één overzicht te tonen.
 Hierdoor worden onderbroken carrières netjes weergegeven, bijvoorbeeld als meerdere periodes.
 
-Vervolgens worden alleen coureurs geselecteerd met minimaal 25 overwinningen. Het winstpercentage wordt berekend 
-door het aantal overwinningen te delen door het aantal deelnames en dit om te zetten naar een percentage. Tot 
+Vervolgens worden alleen coureurs geselecteerd met minimaal 25 overwinningen. Het winstpercentage wordt berekend
+door het aantal overwinningen te delen door het aantal deelnames en dit om te zetten naar een percentage. Tot
 slot wordt gesorteerd op het aantal overwinningen, zodat de meest succesvolle coureurs bovenaan staan.
 
 #### Query plan
@@ -1039,7 +1072,7 @@ WHERE Result.Wins >= 25;
 #### Resultaten
 
 | Driver             | Seasons                    | Entries | Wins | Percentage |
-|--------------------|----------------------------|---------|------|------------|
+| ------------------ | -------------------------- | ------- | ---- | ---------- |
 | Alain Prost        | 1980-1991, 1993            | 202     | 51   | 25.25%     |
 | Ayrton Senna       | 1984-1994                  | 162     | 41   | 25.31%     |
 | Fernando Alonso    | 2001, 2003-2018, 2021-2024 | 404     | 32   | 7.92%      |
@@ -1054,17 +1087,17 @@ WHERE Result.Wins >= 25;
 
 #### Toelichting
 
-Deze alternatieve query berekent het aantal deelnames en overwinningen per coureur met behulp van `CROSS APPLY` en 
-window functions. Voor elke coureur wordt in de gekoppelde subquery gekeken naar alle resultaten van die coureur. 
-Met `COUNT(*) OVER (PARTITION BY Result.DriverId)` wordt het totaal aantal deelnames bepaald, en 
+Deze alternatieve query berekent het aantal deelnames en overwinningen per coureur met behulp van `CROSS APPLY` en
+window functions. Voor elke coureur wordt in de gekoppelde subquery gekeken naar alle resultaten van die coureur.
+Met `COUNT(*) OVER (PARTITION BY Result.DriverId)` wordt het totaal aantal deelnames bepaald, en
 met `COUNT(CASE WHEN Result.Position = 1 THEN 1 END)` het aantal overwinningen.
 
-Omdat de window functions dezelfde waarden teruggeven voor meerdere resultaatregels van dezelfde coureur, wordt 
-`DISTINCT` gebruikt om uiteindelijk één regel per coureur over te houden. De deelnameperiodes worden opnieuw opgehaald 
+Omdat de window functions dezelfde waarden teruggeven voor meerdere resultaatregels van dezelfde coureur, wordt
+`DISTINCT` gebruikt om uiteindelijk één regel per coureur over te houden. De deelnameperiodes worden opnieuw opgehaald
 uit de view DriverYearRanges.
 
-Daarna filtert de query op coureurs met minimaal 25 overwinningen en berekent hij het winstpercentage op dezelfde 
-manier als de primaire uitwerking. Deze aanpak levert inhoudelijk hetzelfde resultaat op, maar gebruikt een andere 
+Daarna filtert de query op coureurs met minimaal 25 overwinningen en berekent hij het winstpercentage op dezelfde
+manier als de primaire uitwerking. Deze aanpak levert inhoudelijk hetzelfde resultaat op, maar gebruikt een andere
 techniek: de tellingen worden niet vooraf in aparte CTE’s gegroepeerd, maar per coureur berekend binnen de `CROSS APPLY`.
 
 #### Query plan
@@ -1097,7 +1130,7 @@ ORDER BY Wins DESC;
 #### Resultaten
 
 | Driver             | Seasons                    | Entries | Wins | Percentage |
-|--------------------|----------------------------|---------|------|------------|
+| ------------------ | -------------------------- | ------- | ---- | ---------- |
 | Lewis Hamilton     | 2007-2024                  | 356     | 105  | 29.49%     |
 | Michael Schumacher | 1991-2006, 2010-2012       | 308     | 91   | 29.55%     |
 | Max Verstappen     | 2015-2024                  | 209     | 63   | 30.14%     |
@@ -1118,7 +1151,12 @@ De filtering op minimaal 25 overwinningen gebeurt via de `HAVING`-clausule, omda
 
 #### Query plan
 
+![Queryplan alternatieve implementatie](./assets/5-alternative-query2-plan-part1.png)
+![Queryplan alternatieve implementatie](./assets/5-alternative-query2-plan-part2.png)
+
 #### Aanbevolen indexen
+
+Het execution plan bevatte geen missing-index suggesties.
 
 ### Vergelijking
 
@@ -1128,14 +1166,13 @@ Het grootste verschil is dat de alternatieve implementatie wederom veel gebruikm
 
 Opvallend is dat de primaire implementatie ervoor heeft gekozen geen spooling toe te passen, vermoedelijk omdat SQL Server meer rijen verwerkte dan verwacht. Bij de alternatieve implementatie komt de schatting beter overeen met het daadwerkelijke aantal gelezen rijen, wat de keuze voor spooling verklaart. De oorzaak ligt mogelijk bij onnauwkeurige statistieken, waardoor SQL Server geen goed onderbouwde beslissing kon nemen bij de primaire variant.
 
-Tot slot is het queryplan van de primaire implementatie compacter en bevat het minder stappen. De gemaakte beslissingen zijn echter suboptimaal, wat leidt tot inefficiënt gebruik van de beschikbare data.
+Tot slot is het queryplan van de primaire implementatie compacter en bevat het minder stappen. De gemaakte beslissingen zijn echter suboptimaal, wat leidt tot inefficiënt gebruik van de beschikbare data. De derde variant (Alternatieve Uitwerking 2) voert de aggregatie uit met een eenvoudige GROUP BY en conditionele SUM, wat de meest directe en compacte aanpak is van de drie.
 
 ### Voorkeur
 
 Onze voorkeur gaat uit naar de alternatieve implementatie, al is deze keuze niet zonder voorbehoud. Indien performance de prioriteit is, biedt de spooling in de alternatieve variant voordelen. Wanneer geheugen- en I/O-gebruik leidend zijn, zou de primaire implementatie de voorkeur verdienen, omdat deze geen potentiële disk- of geheugenspooling kent, al gaat dat ten koste van meer iteraties en bijbehorende I/O.
 
 De primaire implementatie heeft een overzichtelijker queryplan; de alternatieve heeft beter leesbare code. Doorslaggevend is echter dat de alternatieve implementatie een betere overeenkomst toont tussen geschatte en daadwerkelijke rijen, waardoor SQL Server beter onderbouwde beslissingen kan nemen omtrent query-uitvoering. Om die reden heeft de alternatieve implementatie onze voorkeur.
-
 
 ## Er zijn niet ieder jaar evenveel wedstrijden gereden. Daarom is het interessant om te zien welke coureur procentueel de meeste races per seizoen heeft gewonnen. Maak onderstaand overzicht
 
@@ -1174,7 +1211,7 @@ ORDER BY COALESCE(DriverWins.Wins, 0) * 1.0 / DriverRaces.Races DESC;
 #### Resultaten
 
 | Driver             | Season | Races | Wins | Percentage |
-|--------------------|--------|-------|------|------------|
+| ------------------ | ------ | ----- | ---- | ---------- |
 | Jim Rathmann       | 1960   | 1     | 1    | 100.00%    |
 | Sam Hanks          | 1957   | 1     | 1    | 100.00%    |
 | Jim Clark          | 1968   | 1     | 1    | 100.00%    |
@@ -1195,16 +1232,16 @@ ORDER BY COALESCE(DriverWins.Wins, 0) * 1.0 / DriverRaces.Races DESC;
 
 #### Toelichting
 
-Deze query berekent per coureur en per seizoen welk percentage van zijn gereden races hij heeft gewonnen. Eerst 
-wordt in DriverWins per coureur en seizoen geteld hoeveel races hij heeft gewonnen. Daarna wordt in DriverRaces 
+Deze query berekent per coureur en per seizoen welk percentage van zijn gereden races hij heeft gewonnen. Eerst
+wordt in DriverWins per coureur en seizoen geteld hoeveel races hij heeft gewonnen. Daarna wordt in DriverRaces
 per coureur en seizoen geteld aan hoeveel races hij totaal heeft deelgenomen.
 
-In de hoofdquery worden deze twee tellingen gecombineerd. Hierbij wordt een `LEFT JOIN` gebruikt, zodat ook seizoenen 
-waarin een coureur geen enkele race won toch in het resultaat blijven staan. Met `COALESCE` worden ontbrekende 
+In de hoofdquery worden deze twee tellingen gecombineerd. Hierbij wordt een `LEFT JOIN` gebruikt, zodat ook seizoenen
+waarin een coureur geen enkele race won toch in het resultaat blijven staan. Met `COALESCE` worden ontbrekende
 overwinningen dan als 0 weergegeven.
 
-Het winstpercentage wordt berekend door het aantal overwinningen te delen door het aantal gereden races in dat seizoen. 
-`NULLIF` voorkomt hierbij dat er door nul gedeeld wordt. Tot slot wordt gesorteerd op het hoogste winstpercentage, 
+Het winstpercentage wordt berekend door het aantal overwinningen te delen door het aantal gereden races in dat seizoen.
+`NULLIF` voorkomt hierbij dat er door nul gedeeld wordt. Tot slot wordt gesorteerd op het hoogste winstpercentage,
 waardoor coureurs met het grootste aandeel gewonnen races bovenaan komen te staan.
 
 #### Query plan
@@ -1240,7 +1277,7 @@ ORDER BY SUM(IIF(Result.Position = 1, 1, 0)) * 1.0 / COUNT(1) DESC;
 #### Resultaten
 
 | Driver             | Season | Races | Wins | Percentage |
-|--------------------|--------|-------|------|------------|
+| ------------------ | ------ | ----- | ---- | ---------- |
 | Johnnie Parsons    | 1950   | 1     | 1    | 100.00%    |
 | Lee Wallard        | 1951   | 1     | 1    | 100.00%    |
 | Troy Ruttman       | 1952   | 1     | 1    | 100.00%    |
@@ -1261,13 +1298,13 @@ ORDER BY SUM(IIF(Result.Position = 1, 1, 0)) * 1.0 / COUNT(1) DESC;
 
 #### Toelichting
 
-Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van aparte CTE’s voor het aantal races 
+Deze alternatieve query voert dezelfde berekening compacter uit. In plaats van aparte CTE’s voor het aantal races
 en het aantal overwinningen, worden beide waarden direct binnen één GROUP BY berekend.
 
-Per coureur en seizoen telt `COUNT(1)` het totaal aantal gereden races. Het aantal overwinningen wordt berekend met 
+Per coureur en seizoen telt `COUNT(1)` het totaal aantal gereden races. Het aantal overwinningen wordt berekend met
 `SUM(IIF(Result.Position = 1, 1, 0))`: voor elke gewonnen race telt de query 1 op, en voor elke niet-gewonnen race 0.
 
-Daarna wordt het winstpercentage direct berekend met dezelfde waarden. Ook hier zorgt `NULLIF` ervoor dat delen door nul 
+Daarna wordt het winstpercentage direct berekend met dezelfde waarden. Ook hier zorgt `NULLIF` ervoor dat delen door nul
 wordt voorkomen. Deze aanpak is korter en overzichtelijker, omdat alle aggregaties in één stap worden uitgevoerd.
 
 #### Query plan
@@ -1308,21 +1345,21 @@ ORDER BY ss.Wins * 1.0 / ss.Races DESC;
 
 #### Resultaten
 
-| Driver             | Season | Races | Wins | Percentage |
-|--------------------|--------|-------|------|------------|
-| Jim Rathmann       | 1960   | 1     | 1    | 100.00%    |
-| Sam Hanks          | 1957   | 1     | 1    | 100.00%    |
-| Jim Clark          | 1968   | 1     | 1    | 100.00%    |
-| Johnnie Parsons    | 1950   | 1     | 1    | 100.00%    |
-| Bob Sweikert       | 1955   | 1     | 1    | 100.00%    |
-| Troy Ruttman       | 1952   | 1     | 1    | 100.00%    |
-| Bill Vukovich      | 1953   | 1     | 1    | 100.00%    |
-| Pat Flaherty       | 1956   | 1     | 1    | 100.00%    |
-| Lee Wallard        | 1951   | 1     | 1    | 100.00%    |
-| Bill Vukovich      | 1954   | 1     | 1    | 100.00%    |
-| Jimmy Bryan        | 1958   | 1     | 1    | 100.00%    |
-| Max Verstappen     | 2023   | 22    | 19   | 86.36%     |
-| ...                | ...    | ...   | ...  | ...        |
+| Driver          | Season | Races | Wins | Percentage |
+| --------------- | ------ | ----- | ---- | ---------- |
+| Jim Rathmann    | 1960   | 1     | 1    | 100.00%    |
+| Sam Hanks       | 1957   | 1     | 1    | 100.00%    |
+| Jim Clark       | 1968   | 1     | 1    | 100.00%    |
+| Johnnie Parsons | 1950   | 1     | 1    | 100.00%    |
+| Bob Sweikert    | 1955   | 1     | 1    | 100.00%    |
+| Troy Ruttman    | 1952   | 1     | 1    | 100.00%    |
+| Bill Vukovich   | 1953   | 1     | 1    | 100.00%    |
+| Pat Flaherty    | 1956   | 1     | 1    | 100.00%    |
+| Lee Wallard     | 1951   | 1     | 1    | 100.00%    |
+| Bill Vukovich   | 1954   | 1     | 1    | 100.00%    |
+| Jimmy Bryan     | 1958   | 1     | 1    | 100.00%    |
+| Max Verstappen  | 2023   | 22    | 19   | 86.36%     |
+| ...             | ...    | ...   | ...  | ...        |
 
 #### Toelichting
 
@@ -1332,7 +1369,11 @@ In tegenstelling tot de eerdere implementaties werkt deze query niet met een `GR
 
 #### Query plan
 
+![Queryplan alternatieve implementatie](./assets/6-alternative-query2-plan.png)
+
 #### Aanbevolen indexen
+
+Het execution plan bevatte geen missing-index suggesties.
 
 ### Vergelijking
 
@@ -1340,7 +1381,7 @@ Het meest opvallende verschil tussen de twee queryplannen is de manier waarop de
 
 Een ander verschil is het type join dat wordt gebruikt om de twee deelresultaten samen te voegen. De primaire implementatie vereist een Right Outer Join om de gevallen af te handelen waarin een coureur geen overwinningen heeft in een bepaald seizoen. De alternatieve implementatie heeft deze extra join niet nodig, omdat wins en races direct in dezelfde aggregatiestap worden berekend en een ontbrekende overwinning simpelweg als nul uitkomt via `SUM(IIF(...))`.
 
-Het queryplan van de alternatieve implementatie is daarmee lineairder en bevat minder operators. De primaire implementatie heeft een complexer plan met meer vertakkingen, al is de code door de benoemde CTEs wel explicieter leesbaar.
+Het queryplan van de alternatieve implementatie is daarmee lineairder en bevat minder operators. De primaire implementatie heeft een complexer plan met meer vertakkingen, al is de code door de benoemde CTEs wel explicieter leesbaar. De derde variant (Alternatieve Uitwerking 2) kiest voor een CROSS APPLY per coureur-seizoen-combinatie, wat met een geschikte index efficiënt kan zijn maar extra complexiteit introduceert ten opzichte van de eerste alternatieve uitwerking.
 
 ### Voorkeur
 
@@ -1547,7 +1588,7 @@ ORDER BY DriverStanding.Position;
 #### Resultaten
 
 | POS | DRIVER           | NATIONALITY | CAR            | PTS            |
-|-----|------------------|-------------|----------------|----------------|
+| --- | ---------------- | ----------- | -------------- | -------------- |
 | 1   | Max Verstappen   | Dutch       | Red Bull       | 395.5000000000 |
 | 2   | Lewis Hamilton   | British     | Mercedes       | 387.5000000000 |
 | 3   | Valtteri Bottas  | Finnish     | Mercedes       | 226.0000000000 |
@@ -1563,15 +1604,15 @@ ORDER BY DriverStanding.Position;
 
 #### Toelichting
 
-Deze query maakt de eindstand van het coureurskampioenschap van 2021 na. Hiervoor wordt gebruikgemaakt van de tabel 
-DriverStanding, waarin de stand per race is opgeslagen. Door te filteren op het seizoen 2021 en de laatste race van 
+Deze query maakt de eindstand van het coureurskampioenschap van 2021 na. Hiervoor wordt gebruikgemaakt van de tabel
+DriverStanding, waarin de stand per race is opgeslagen. Door te filteren op het seizoen 2021 en de laatste race van
 dat seizoen, wordt de definitieve eindstand geselecteerd.
 
-De query koppelt deze eindstand aan de tabellen Driver, Race, Result en Constructor. Daardoor kunnen naast de positie 
-en punten ook de naam, nationaliteit en auto/constructor van de coureur worden getoond. De koppeling met Result wordt 
+De query koppelt deze eindstand aan de tabellen Driver, Race, Result en Constructor. Daardoor kunnen naast de positie
+en punten ook de naam, nationaliteit en auto/constructor van de coureur worden getoond. De koppeling met Result wordt
 gebruikt om de constructor te bepalen waarmee de coureur in die race heeft gereden.
 
-Tot slot wordt gesorteerd op DriverStanding.Position, zodat de eindstand in de juiste volgorde wordt weergegeven: van 
+Tot slot wordt gesorteerd op DriverStanding.Position, zodat de eindstand in de juiste volgorde wordt weergegeven: van
 kampioen naar lager geklasseerde coureurs.
 
 #### Query plan
@@ -1621,7 +1662,7 @@ ORDER BY DriverStanding.Position;
 #### Resultaten
 
 | POS | DRIVER           | NATIONALITY | CAR            | PTS            |
-|-----|------------------|-------------|----------------|----------------|
+| --- | ---------------- | ----------- | -------------- | -------------- |
 | 1   | Max Verstappen   | Dutch       | Red Bull       | 395.5000000000 |
 | 2   | Lewis Hamilton   | British     | Mercedes       | 387.5000000000 |
 | 3   | Valtteri Bottas  | Finnish     | Mercedes       | 226.0000000000 |
@@ -1637,14 +1678,14 @@ ORDER BY DriverStanding.Position;
 
 #### Toelichting
 
-Deze alternatieve query haalt dezelfde eindstand op, maar bepaalt de constructor via een `CROSS APPLY`. Per coureur 
-wordt binnen de laatste race van 2021 het bijbehorende resultaat opgezocht en daaruit de ConstructorId gehaald. Met 
+Deze alternatieve query haalt dezelfde eindstand op, maar bepaalt de constructor via een `CROSS APPLY`. Per coureur
+wordt binnen de laatste race van 2021 het bijbehorende resultaat opgezocht en daaruit de ConstructorId gehaald. Met
 `TOP 1` wordt één resultaatregel geselecteerd.
 
-Daarnaast wordt de laatste race van 2021 bepaald met `SELECT TOP 1 RaceId ... ORDER BY RaceDate DESC`. Daardoor wordt 
+Daarnaast wordt de laatste race van 2021 bepaald met `SELECT TOP 1 RaceId ... ORDER BY RaceDate DESC`. Daardoor wordt
 expliciet gekeken naar de meest recente racedatum binnen het seizoen, in plaats van naar het hoogste RaceId.
 
-Daarna worden de gegevens gekoppeld aan DriverStanding, Driver, Race en Constructor. Het eindresultaat is hetzelfde 
+Daarna worden de gegevens gekoppeld aan DriverStanding, Driver, Race en Constructor. Het eindresultaat is hetzelfde
 overzicht van de eindstand, inclusief positie, coureur, nationaliteit, constructor en punten.
 
 #### Query plan
@@ -1696,7 +1737,7 @@ ORDER BY DriverStanding.Position;
 #### Resultaten
 
 | POS | DRIVER           | NATIONALITY | CAR            | PTS            |
-|-----|------------------|-------------|----------------|----------------|
+| --- | ---------------- | ----------- | -------------- | -------------- |
 | 1   | Max Verstappen   | Dutch       | Red Bull       | 395.5000000000 |
 | 2   | Lewis Hamilton   | British     | Mercedes       | 387.5000000000 |
 | 3   | Valtteri Bottas  | Finnish     | Mercedes       | 226.0000000000 |
@@ -1718,29 +1759,35 @@ Het gebruik van een `CROSS JOIN` met een CTE van één rij is een lichte en over
 
 #### Query plan
 
+![Queryplan alternatieve implementatie](./assets/7-alternative-query2-plan.png)
+
 #### Aanbevolen indexen
+
+CREATE NONCLUSTERED INDEX [<Name of Missing Index, sysname,>]
+ON [dbo].[DriverStanding] ([RaceId])
+INCLUDE ([DriverId],[Points],[Position])
 
 ### Vergelijking
 
-Het meest opvallende verschil tussen de twee queryplannen is de manier waarop de constructor wordt opgezocht. De primaire implementatie koppelt de `Result`-tabel via een *Hash Join*, waarvoor eerst een *Full Index Scan* over ongeveer 26 duizend rijen wordt uitgevoerd. De alternatieve implementatie doet dit via een `CROSS APPLY` met een *Lazy Spool* en een Transformation (Top), wat overeenkomt met de TOP 1 in de subquery. Hierdoor wordt per coureur slechts 1 rij uit Result opgehaald in plaats van de volledige tabel te scannen.
+Het meest opvallende verschil tussen de twee queryplannen is de manier waarop de constructor wordt opgezocht. De primaire implementatie koppelt de `Result`-tabel via een _Hash Join_, waarvoor eerst een _Full Index Scan_ over ongeveer 26 duizend rijen wordt uitgevoerd. De alternatieve implementatie doet dit via een `CROSS APPLY` met een _Lazy Spool_ en een Transformation (Top), wat overeenkomt met de TOP 1 in de subquery. Hierdoor wordt per coureur slechts 1 rij uit Result opgehaald in plaats van de volledige tabel te scannen.
 
-Ook de bepaling van de laatste race verloopt anders. De primaire implementatie gebruikt een Stream Aggregate met een *Transformation (Top)* om het hoogste RaceId te vinden. De alternatieve implementatie gebruikt een *TopN* Sort op de `Race`-tabel, passend bij de `ORDER BY RaceDate DESC` aanpak. Beide leiden tot 1 rij, maar via een ander pad.
+Ook de bepaling van de laatste race verloopt anders. De primaire implementatie gebruikt een Stream Aggregate met een _Transformation (Top)_ om het hoogste RaceId te vinden. De alternatieve implementatie gebruikt een _TopN_ Sort op de `Race`-tabel, passend bij de `ORDER BY RaceDate DESC` aanpak. Beide leiden tot 1 rij, maar via een ander pad.
 
-Tot slot bevat de primaire implementatie een expliciete *Sort*-operator voor de *Hash Join* op `Result`. In de alternatieve implementatie ontbreekt deze, maar verschijnt een *Lazy Spool* die tussenresultaten buffert voor hergebruik in de nested loops.
+Tot slot bevat de primaire implementatie een expliciete _Sort_-operator voor de _Hash Join_ op `Result`. In de alternatieve implementatie ontbreekt deze, maar verschijnt een _Lazy Spool_ die tussenresultaten buffert voor hergebruik in de nested loops. De derde variant (Alternatieve Uitwerking 2) plaatst de constructor-opzoeking in een gecorreleerde subquery binnen de SELECT, wat de query compacter maakt maar per rij een extra uitvoering vereist.
 
 ### Voorkeur
 
-De voorkeur gaat uit naar de alternatieve implementatie. Het belangrijkste bezwaar tegen de primaire variant is de 
-*Full Index Scan* over de volledige Result-tabel, die de alternatieve implementatie met de `TOP 1 CROSS APPLY` weet te 
-vermijden. Daarnaast is het gebruik van `ORDER BY RaceDate DESC` om de laatste race te bepalen robuuster 
-dan `MAX(RaceId)`, omdat een RaceId niet gegarandeerd chronologisch oploopt. De alternatieve implementatie maakt 
+De voorkeur gaat uit naar de alternatieve implementatie. Het belangrijkste bezwaar tegen de primaire variant is de
+_Full Index Scan_ over de volledige Result-tabel, die de alternatieve implementatie met de `TOP 1 CROSS APPLY` weet te
+vermijden. Daarnaast is het gebruik van `ORDER BY RaceDate DESC` om de laatste race te bepalen robuuster
+dan `MAX(RaceId)`, omdat een RaceId niet gegarandeerd chronologisch oploopt. De alternatieve implementatie maakt
 daarmee beter onderbouwde aannames over de data, wat zich ook vertaalt in een lagere totale query cost.
 
 # Constraints (B)
 
-Voor de onderstaande constraints zijn zowel stored procedures als AFTER triggers geïmplementeerd. Op deze manier 
-konden beide oplossingen met elkaar worden vergeleken op het gebied van werking, controle en toepasbaarheid binnen de 
-database. Daarnaast is aandacht besteed aan correcte foutafhandeling door middel van verschillende testsets, waarmee 
+Voor de onderstaande constraints zijn zowel stored procedures als AFTER triggers geïmplementeerd. Op deze manier
+konden beide oplossingen met elkaar worden vergeleken op het gebied van werking, controle en toepasbaarheid binnen de
+database. Daarnaast is aandacht besteed aan correcte foutafhandeling door middel van verschillende testsets, waarmee
 gecontroleerd is hoe de stored procedures en triggers reageren op zowel geldige als ongeldige invoer.
 
 De volgende constraints zijn uitgewerkt:
@@ -1750,14 +1797,14 @@ De volgende constraints zijn uitgewerkt:
 3. Een seizoen bevat maximaal 25 races.
 4. Vanaf seizoen 2014 mag een startnummer binnen een seizoen slechts door één coureur worden gebruikt.
 5. Voor de kwalificatie van een race geldt per coureur één van de volgende situaties:
--alleen kwalificatie 1 gereden;
--alleen kwalificatie 1 en 2 gereden;
--alle kwalificaties gereden.
+   -alleen kwalificatie 1 gereden;
+   -alleen kwalificatie 1 en 2 gereden;
+   -alle kwalificaties gereden.
 
 (Constraint 5 niet uitvoerbaar)
 
-In dit hoofdstuk worden per constraint zowel de stored procedure als de trigger besproken en geanalyseerd. Vervolgens 
-wordt per onderdeel een afweging gemaakt tussen beide implementaties en wordt gemotiveerd welke oplossing de voorkeur 
+In dit hoofdstuk worden per constraint zowel de stored procedure als de trigger besproken en geanalyseerd. Vervolgens
+wordt per onderdeel een afweging gemaakt tussen beide implementaties en wordt gemotiveerd welke oplossing de voorkeur
 heeft, hier gaan de testresultaten ook aan bijdragen.
 
 ## Constraint 1: Vanaf seizoen 1962 komt per race een positie slechts één keer voor in de uitslag.
@@ -2493,17 +2540,17 @@ fouten of omzeiling maakt deze aanpak minder geschikt voor het waarborgen van da
 
 # Transactie Management & Concurrency (C)
 
-De triggers en stored procedures uit opdracht B werken correct binnen de opgestelde testcases. Toch betekent dit niet 
+De triggers en stored procedures uit opdracht B werken correct binnen de opgestelde testcases. Toch betekent dit niet
 automatisch dat de implementatie ook veilig is binnen een echte applicatieomgeving. In een productieomgeving kunnen
-meerdere gebruikers of processen namelijk tegelijkertijd dezelfde gegevens proberen te lezen of aan te passen. 
+meerdere gebruikers of processen namelijk tegelijkertijd dezelfde gegevens proberen te lezen of aan te passen.
 Hierdoor kunnen race conditions en andere concurrency-problemen ontstaan.
 
-Vooral bij stored procedures en triggers die databankregels en integriteit moeten afdwingen, is het belangrijk om 
-rekening te houden met transacties en isolation levels. Een implementatie die functioneel correct lijkt, kan zonder 
+Vooral bij stored procedures en triggers die databankregels en integriteit moeten afdwingen, is het belangrijk om
+rekening te houden met transacties en isolation levels. Een implementatie die functioneel correct lijkt, kan zonder
 het juiste isolation level alsnog inconsistente data toelaten.
 
-In dit onderdeel wordt onderzocht welke isolation levels het meest geschikt zijn voor de uitgewerkte business rules. 
-Daarnaast wordt bekeken welke problemen kunnen ontstaan bij het standaard isolation level `READ COMMITTED`, en hoe 
+In dit onderdeel wordt onderzocht welke isolation levels het meest geschikt zijn voor de uitgewerkte business rules.
+Daarnaast wordt bekeken welke problemen kunnen ontstaan bij het standaard isolation level `READ COMMITTED`, en hoe
 hogere isolation levels deze problemen kunnen voorkomen.
 
 ## Vanaf seizoen 1962 komt per race een positie slechts één keer voor in de uitslag
@@ -2512,21 +2559,21 @@ hogere isolation levels deze problemen kunnen voorkomen.
 
 Aanbevolen isolation level: `SERIALIZABLE`
 
-Zowel de stored procedures als de trigger controleren eerst of een bepaalde positie binnen een race al bestaat 
+Zowel de stored procedures als de trigger controleren eerst of een bepaalde positie binnen een race al bestaat
 voordat de wijziging wordt uitgevoerd. Hierdoor ontstaat een klassiek concurrency-probleem.
 
-Bij het standaard isolation level `READ COMMITTED` kunnen twee transacties tegelijkertijd controleren of dezelfde 
-positie nog vrij is. Omdat niet-gecommitte wijzigingen niet zichtbaar zijn, kunnen beide transacties denken dat de 
+Bij het standaard isolation level `READ COMMITTED` kunnen twee transacties tegelijkertijd controleren of dezelfde
+positie nog vrij is. Omdat niet-gecommitte wijzigingen niet zichtbaar zijn, kunnen beide transacties denken dat de
 positie beschikbaar is. Uiteindelijk worden dan toch dubbele posities opgeslagen.
 
-`READ COMMITTED` houdt locks slechts kort vast tijdens het lezen van data. Hierdoor kunnen andere transacties 
+`READ COMMITTED` houdt locks slechts kort vast tijdens het lezen van data. Hierdoor kunnen andere transacties
 tussendoor nieuwe rijen toevoegen die de controle ongeldig maken.
 
-Met `SERIALIZABLE` blijven de locks actief gedurende de volledige transactie. Daarnaast voorkomt dit isolation level 
-ook zogenaamde *phantom rows*, waardoor geen nieuwe records kunnen worden toegevoegd die binnen dezelfde controle 
+Met `SERIALIZABLE` blijven de locks actief gedurende de volledige transactie. Daarnaast voorkomt dit isolation level
+ook zogenaamde _phantom rows_, waardoor geen nieuwe records kunnen worden toegevoegd die binnen dezelfde controle
 vallen.
 
-Hierdoor blijft de combinatie van `RaceId` en `Position` betrouwbaar uniek, ook wanneer meerdere transacties 
+Hierdoor blijft de combinatie van `RaceId` en `Position` betrouwbaar uniek, ook wanneer meerdere transacties
 gelijktijdig uitgevoerd worden.
 
 ---
@@ -2537,17 +2584,17 @@ gelijktijdig uitgevoerd worden.
 
 Aanbevolen isolation level: `SERIALIZABLE`
 
-Deze business rule controleert of een driver al voorkomt binnen dezelfde race. De stored procedures en trigger 
+Deze business rule controleert of een driver al voorkomt binnen dezelfde race. De stored procedures en trigger
 voeren eerst een controle uit en passen daarna pas de data aan.
 
-Bij `READ COMMITTED` kunnen twee transacties tegelijk dezelfde `DriverId` voor dezelfde race invoegen of aanpassen. 
-Beide transacties zien de wijziging van de andere nog niet en gaan er dus vanuit dat de invoer geldig is. Hierdoor 
+Bij `READ COMMITTED` kunnen twee transacties tegelijk dezelfde `DriverId` voor dezelfde race invoegen of aanpassen.
+Beide transacties zien de wijziging van de andere nog niet en gaan er dus vanuit dat de invoer geldig is. Hierdoor
 kan dezelfde coureur uiteindelijk meerdere keren in dezelfde uitslag voorkomen.
 
-Omdat locks bij `READ COMMITTED` snel worden vrijgegeven, kunnen andere transacties tijdens de controle nog steeds 
+Omdat locks bij `READ COMMITTED` snel worden vrijgegeven, kunnen andere transacties tijdens de controle nog steeds
 nieuwe records toevoegen die de validatie beïnvloeden.
 
-Met `SERIALIZABLE` blijven de locks actief tot het einde van de transactie en worden ook nieuwe invoegen binnen 
+Met `SERIALIZABLE` blijven de locks actief tot het einde van de transactie en worden ook nieuwe invoegen binnen
 dezelfde zoekresultaten tegengehouden. Hierdoor blijft de combinatie van `RaceId` en `DriverId` correct uniek.
 
 ---
@@ -2558,17 +2605,17 @@ dezelfde zoekresultaten tegengehouden. Hierdoor blijft de combinatie van `RaceId
 
 Aanbevolen isolation level: `SERIALIZABLE`
 
-Bij deze regel wordt eerst geteld hoeveel races al aanwezig zijn binnen een seizoen. Daarna wordt pas een nieuwe race 
+Bij deze regel wordt eerst geteld hoeveel races al aanwezig zijn binnen een seizoen. Daarna wordt pas een nieuwe race
 toegevoegd of aangepast.
 
-Onder `READ COMMITTED` kan een race condition ontstaan wanneer twee transacties tegelijkertijd het aantal races 
-controleren. Beide transacties kunnen bijvoorbeeld 24 races tellen en besluiten dat er nog één race toegevoegd mag 
+Onder `READ COMMITTED` kan een race condition ontstaan wanneer twee transacties tegelijkertijd het aantal races
+controleren. Beide transacties kunnen bijvoorbeeld 24 races tellen en besluiten dat er nog één race toegevoegd mag
 worden. Wanneer beide transacties daarna succesvol uitvoeren, bevat het seizoen uiteindelijk 26 races.
 
-Omdat `READ COMMITTED` de locks na het lezen vrijgeeft, kan een andere transactie ondertussen nog extra records 
+Omdat `READ COMMITTED` de locks na het lezen vrijgeeft, kan een andere transactie ondertussen nog extra records
 toevoegen binnen hetzelfde seizoen.
 
-`SERIALIZABLE` voorkomt dit probleem doordat het de gelezen gegevens en het zoekbereik van de query vasthoudt tot het 
+`SERIALIZABLE` voorkomt dit probleem doordat het de gelezen gegevens en het zoekbereik van de query vasthoudt tot het
 einde van de transactie. Hierdoor kunnen geen extra races worden toegevoegd zolang de controle bezig is.
 
 Op deze manier blijft de limiet van maximaal 25 races per seizoen gegarandeerd behouden.
@@ -2581,37 +2628,37 @@ Op deze manier blijft de limiet van maximaal 25 races per seizoen gegarandeerd b
 
 Aanbevolen isolation level: `SERIALIZABLE`
 
-De stored procedures controleren of een bepaald `ResultNumber` binnen hetzelfde seizoen al gekoppeld is aan een andere 
+De stored procedures controleren of een bepaald `ResultNumber` binnen hetzelfde seizoen al gekoppeld is aan een andere
 driver. Pas daarna wordt de wijziging uitgevoerd.
 
-Bij `READ COMMITTED` kunnen twee transacties tegelijk hetzelfde startnummer controleren. Omdat beide transacties de 
-wijziging van de andere nog niet zien, kunnen ze allebei besluiten dat het nummer nog beschikbaar is. Hierdoor kan 
+Bij `READ COMMITTED` kunnen twee transacties tegelijk hetzelfde startnummer controleren. Omdat beide transacties de
+wijziging van de andere nog niet zien, kunnen ze allebei besluiten dat het nummer nog beschikbaar is. Hierdoor kan
 hetzelfde startnummer uiteindelijk toch aan meerdere coureurs gekoppeld worden.
 
-Doordat locks bij `READ COMMITTED` slechts tijdelijk actief blijven, kunnen andere transacties ondertussen nieuwe 
+Doordat locks bij `READ COMMITTED` slechts tijdelijk actief blijven, kunnen andere transacties ondertussen nieuwe
 records toevoegen die de controle ongeldig maken.
 
-Met `SERIALIZABLE` blijven de locks behouden tijdens de volledige transactie en worden ook nieuwe invoegen binnen 
+Met `SERIALIZABLE` blijven de locks behouden tijdens de volledige transactie en worden ook nieuwe invoegen binnen
 dezelfde controle tegengehouden. Hierdoor blijft elk startnummer uniek binnen een seizoen.
 
 ### Trigger
 
 Aanbevolen isolation level: `REPEATABLE READ`
 
-Voor deze trigger is `REPEATABLE READ` een verdedigbare keuze. De trigger controleert voornamelijk bestaande records 
+Voor deze trigger is `REPEATABLE READ` een verdedigbare keuze. De trigger controleert voornamelijk bestaande records
 om te bepalen of een `ResultNumber` al gekoppeld is aan een andere driver binnen hetzelfde seizoen.
 
-Bij `READ COMMITTED` kunnen gelezen rijen tijdens de transactie nog aangepast worden door andere transacties. Hierdoor 
+Bij `READ COMMITTED` kunnen gelezen rijen tijdens de transactie nog aangepast worden door andere transacties. Hierdoor
 kan de controle achteraf ongeldig blijken.
 
-Met `REPEATABLE READ` blijven de gelezen rijen gelocked tot het einde van de transactie. Daardoor kunnen bestaande 
+Met `REPEATABLE READ` blijven de gelezen rijen gelocked tot het einde van de transactie. Daardoor kunnen bestaande
 records die deel uitmaken van de controle niet tussentijds aangepast worden.
 
-Wel blijft er nog een mogelijk probleem bestaan met zogenaamde *phantom rows*. Een andere transactie zou namelijk 
-nog steeds een volledig nieuwe rij kunnen invoegen met hetzelfde startnummer. Om ook dat volledig te voorkomen, 
+Wel blijft er nog een mogelijk probleem bestaan met zogenaamde _phantom rows_. Een andere transactie zou namelijk
+nog steeds een volledig nieuwe rij kunnen invoegen met hetzelfde startnummer. Om ook dat volledig te voorkomen,
 zou `SERIALIZABLE` nodig zijn.
 
-Toch is `REPEATABLE READ` hier een redelijke afweging, omdat de trigger voornamelijk bestaande conflicterende 
+Toch is `REPEATABLE READ` hier een redelijke afweging, omdat de trigger voornamelijk bestaande conflicterende
 records controleert in plaats van grote aantallen nieuwe inserts te verwerken.
 
 # Indexeren (D)
@@ -2619,7 +2666,7 @@ records controleert in plaats van grote aantallen nieuwe inserts te verwerken.
 Tijdens het uitwerken van de bevragingen in opdracht A zijn diverse indexen naar boven gekomen die
 aanbevolen zijn door ide SQL-Server/IDE. Tijdens deze opdracht zullen deze aanbevelingen bekeken
 en toegepast worden. Hierbij zullen eerst alle aanbevelingen samen worden gebracht, zodat hier
-goed naar gekeken kan worden, hierna zullen deze worden besproken, vergeleken en samengevoegd, 
+goed naar gekeken kan worden, hierna zullen deze worden besproken, vergeleken en samengevoegd,
 waarna deze uit zullen worden gewerkt met daarna tot slot een korte kijk naar de optimalisaties,
 en of het verandering brengt in onze queries van voorkeur.
 
@@ -2642,28 +2689,28 @@ create index Result_RaceId_index
     on dbo.Result (RaceId) include (DriverId, Laps)
 go
 
--- Van 2004 tot en met 2024: per race de snelste ronde met circuit, 
---  racedatum, coureur, rondenummer, rondetijd, positie, punten, 
---  totaal aantal rondes en resultstatus; gesorteerd op circuit en 
+-- Van 2004 tot en met 2024: per race de snelste ronde met circuit,
+--  racedatum, coureur, rondenummer, rondetijd, positie, punten,
+--  totaal aantal rondes en resultstatus; gesorteerd op circuit en
 --  daarna op rondetijd.
 create index Result_FastestLapTime_index
-    on dbo.Result (FastestLapTime) include (RaceId, DriverId, PositionText, 
+    on dbo.Result (FastestLapTime) include (RaceId, DriverId, PositionText,
         Points, Laps, FastestLap, ResultStatusId)
 go
 
 create index Result_RaceId_FastestLapTime_index
-    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText, 
+    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText,
         Points, Laps, FastestLap, ResultStatusId)
 go
 
--- Welke coureurs hebben na deelname van een of meerdere seizoenen 
---  een periode niet deelgenomen en zijn in een later seizoen weer 
+-- Welke coureurs hebben na deelname van een of meerdere seizoenen
+--  een periode niet deelgenomen en zijn in een later seizoen weer
 --  teruggekeerd in de Formule 1?
 create index Result_RaceId_index
     on dbo.Result (RaceId) include (DriverId)
 go
 
--- Maak een overzicht van alle F1 coureurs die in hun volledige 
+-- Maak een overzicht van alle F1 coureurs die in hun volledige
 --  carrière 25 of meer wedstrijden hebben gewonnen.
 create index Result_RaceId_index
     on dbo.Result (RaceId) include (DriverId)
@@ -2673,8 +2720,8 @@ create index Result_DriverId_index
     on dbo.Result (DriverId)
     go
 
--- Er zijn niet ieder jaar evenveel wedstrijden gereden. 
---  Daarom is het interessant om te zien welke coureur 
+-- Er zijn niet ieder jaar evenveel wedstrijden gereden.
+--  Daarom is het interessant om te zien welke coureur
 --  procentueel de meeste races per seizoen heeft gewonnen.
 create index Result_RaceId_index
     on dbo.Result (RaceId) include (DriverId)
@@ -2710,7 +2757,7 @@ samengebracht, vergeleken en aangepast.
 
 ### Index op `RaceId` (en `DriverId`) in `Result`
 
-Een van de meest aanbevolen indexen was die op de `Result` tabel, en dan specifiek op 
+Een van de meest aanbevolen indexen was die op de `Result` tabel, en dan specifiek op
 de `RaceId` kolom. Hieronder volgen alle aanbevolen indexen voor deze tabel en kolom.
 
 ```sql
@@ -2780,7 +2827,7 @@ go
 
 Deze zou een lookup van resultaten op basis van zowel de `RaceId` als `DriverId` kolom versnellen. Het los aanmaken
 van deze index zorgt echter wel voor overlap met de hiervoor bepaalde index, wat niet verstandig is. Gelukkig heeft
-SQL-Server de *left-based prefix rule* wat eigenlijk inhoudt, dat een samengestelde index gebruikt kan worden, voor
+SQL-Server de _left-based prefix rule_ wat eigenlijk inhoudt, dat een samengestelde index gebruikt kan worden, voor
 het raadplegen van een van de componenten, zolang je begint met de eerste kolommen van de index.
 
 In dit geval, zou er bij de eerste index op basis van de `RaceId` gezocht worden, hetzelfde zoeken zou dus ook werken
@@ -2825,9 +2872,9 @@ includes moet bevatten, tenzij het echt nodig is. Om te voorkomen dat indexen gr
 aangepast worden.
 
 In deze situatie is het echter wel een interessante keuze, na onderzoek te doen naar de impact van included
-columns, zijn wij erachter gekomen dat deze serieuze impact hebben op *Nested Loop* operations, hierbij wordt
+columns, zijn wij erachter gekomen dat deze serieuze impact hebben op _Nested Loop_ operations, hierbij wordt
 dan voorkomen dat er een key-lookup plaats hoeft te vinden, per iteratie. In dit geval blijkt ook, dat de
-bevragingen waaruit deze aanbeveling kwam, gebruik maken van *Nested Loop* operators. Hierdoor is deze index
+bevragingen waaruit deze aanbeveling kwam, gebruik maken van _Nested Loop_ operators. Hierdoor is deze index
 wel een serieuze kandidaat, die voor flinke speedup kan zorgen. Daarom kiezen wij om deze aanbevolen kolommen
 te behouden.
 
@@ -2837,47 +2884,47 @@ Een van de laatste aanbevolen indexen gaat over de kolom `FastestLapTime` in de 
 
 ```sql
 create index Result_FastestLapTime_index
-    on dbo.Result (FastestLapTime) include (RaceId, DriverId, PositionText, 
+    on dbo.Result (FastestLapTime) include (RaceId, DriverId, PositionText,
         Points, Laps, FastestLap, ResultStatusId)
 go
 ```
 
-Wat hier vooral opvalt is hoeveel kolommen er in de `INCLUDE` zitten. De index wordt daardoor vrij breed en lijkt bijna 
-op een extra kopie van de tabel, met `FastestLapTime` als sleutel. Dat kan prima werken, maar het geeft wel aan dat de 
+Wat hier vooral opvalt is hoeveel kolommen er in de `INCLUDE` zitten. De index wordt daardoor vrij breed en lijkt bijna
+op een extra kopie van de tabel, met `FastestLapTime` als sleutel. Dat kan prima werken, maar het geeft wel aan dat de
 query na het filteren nog veel kolommen nodig heeft.
 
-In de queryplannen zie je dat er opnieuw nested loops gebruikt worden. In zo’n geval helpt deze index wel, omdat je een 
-hoop key lookups voorkomt. Het plan wordt dus goedkoper, maar je bent eigenlijk vooral aan het optimaliseren rondom die 
+In de queryplannen zie je dat er opnieuw nested loops gebruikt worden. In zo’n geval helpt deze index wel, omdat je een
+hoop key lookups voorkomt. Het plan wordt dus goedkoper, maar je bent eigenlijk vooral aan het optimaliseren rondom die
 nested loops in plaats van het onderliggende probleem op te lossen.
 
-Het is daarom zinvoller om te kijken waarom de optimizer überhaupt voor nested loops kiest. Dat kan liggen aan de query zelf, 
-maar ook aan de statistics. In meerdere plannen is te zien dat de estimated en actual rows niet goed overeenkomen, en dat is 
+Het is daarom zinvoller om te kijken waarom de optimizer überhaupt voor nested loops kiest. Dat kan liggen aan de query zelf,
+maar ook aan de statistics. In meerdere plannen is te zien dat de estimated en actual rows niet goed overeenkomen, en dat is
 vaak een teken dat de optimizer op basis van verkeerde aannames werkt.
 
 ### Index op `RaceId` en `FastestLapTime` van `Result`
 
 ```sql
 create index Result_RaceId_FastestLapTime_index
-    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText, 
+    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText,
         Points, Laps, FastestLap, ResultStatusId)
 go
 ```
 
-Deze index voelt een stuk logischer. Door `RaceId` als eerste kolom te gebruiken, sluit hij beter aan op hoe de data 
-meestal benaderd wordt: eerst een specifieke race, en daarna de rondetijden binnen die race. De combinatie met `FastestLapTime` 
+Deze index voelt een stuk logischer. Door `RaceId` als eerste kolom te gebruiken, sluit hij beter aan op hoe de data
+meestal benaderd wordt: eerst een specifieke race, en daarna de rondetijden binnen die race. De combinatie met `FastestLapTime`
 maakt de index ook selectiever dan wanneer je alleen op die kolom indexeert.
 
-De index is nog steeds breed door de `INCLUDE`, dus hij zal meer ruimte innemen en duurder zijn bij writes. Daar staat tegenover 
+De index is nog steeds breed door de `INCLUDE`, dus hij zal meer ruimte innemen en duurder zijn bij writes. Daar staat tegenover
 dat hij waarschijnlijk wel de benodigde queries volledig kan afdekken, waardoor extra lookups niet nodig zijn.
 
-Als je moet kiezen, is deze variant met `(RaceId, FastestLapTime)` de meest logische. Tegelijk blijft het belangrijk om 
-niet alleen naar de index te kijken, maar ook naar de oorzaak van het gekozen queryplan, zeker omdat de afwijking tussen 
+Als je moet kiezen, is deze variant met `(RaceId, FastestLapTime)` de meest logische. Tegelijk blijft het belangrijk om
+niet alleen naar de index te kijken, maar ook naar de oorzaak van het gekozen queryplan, zeker omdat de afwijking tussen
 estimated en actual rows erop wijst dat de optimizer niet altijd de juiste keuzes maakt.
 
 ## Selectie en toepassen van indexen
 
-Nu alle aanbevolen indexen onder de loep zijn genomen, wordt er een selectie gemaakt van in totaal drie indexen. 
-Hierbij is gekeken naar hoe breed inzetbaar ze zijn en of ze niet te veel overlap met elkaar hebben. 
+Nu alle aanbevolen indexen onder de loep zijn genomen, wordt er een selectie gemaakt van in totaal drie indexen.
+Hierbij is gekeken naar hoe breed inzetbaar ze zijn en of ze niet te veel overlap met elkaar hebben.
 De gekozen indexen zijn als volgt.
 
 ### Index op `RaceId` (en `DriverId`) in `Result`
@@ -2887,8 +2934,8 @@ create index Result_RaceId_index
     on dbo.Result (RaceId, DriverId) include (Laps)
 ```
 
-Deze index is gekozen omdat veel queries beginnen met het filteren op `RaceId`. Door `DriverId` mee te nemen in de sleutel kan er ook 
-efficiënt gezocht worden op combinaties van race en coureur. De `Laps` kolom is toegevoegd als include omdat deze vaak nodig is in de 
+Deze index is gekozen omdat veel queries beginnen met het filteren op `RaceId`. Door `DriverId` mee te nemen in de sleutel kan er ook
+efficiënt gezocht worden op combinaties van race en coureur. De `Laps` kolom is toegevoegd als include omdat deze vaak nodig is in de
 select, waardoor extra lookups vermeden worden. Tegelijk blijft de index relatief compact en breed inzetbaar.
 
 ### Index op `RaceId` van `DriverStanding`
@@ -2898,21 +2945,21 @@ create index DriverStanding_RaceId_index
     on dbo.DriverStanding (RaceId) include (DriverId, Points, Position)
 ```
 
-Deze index sluit direct aan op queries die standings per race ophalen. Omdat in die queries vrijwel altijd ook `DriverId`, `Points` 
-en `Position` nodig zijn, zorgt deze index ervoor dat de benodigde data direct beschikbaar is. Dit voorkomt herhaaldelijke key 
-lookups, wat vooral bij *nested loops* een merkbaar verschil maakt in performance.
+Deze index sluit direct aan op queries die standings per race ophalen. Omdat in die queries vrijwel altijd ook `DriverId`, `Points`
+en `Position` nodig zijn, zorgt deze index ervoor dat de benodigde data direct beschikbaar is. Dit voorkomt herhaaldelijke key
+lookups, wat vooral bij _nested loops_ een merkbaar verschil maakt in performance.
 
 ### Index op `RaceId` en `FastestLapTime` van `Result`
 
 ```sql
 create index Result_RaceId_FastestLapTime_index
-    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText, 
+    on dbo.Result (RaceId, FastestLapTime) include (DriverId, PositionText,
         Points, Laps, FastestLap, ResultStatusId)
 ```
 
-Deze index is gekozen omdat hij beter aansluit op het gebruikspatroon van de queries dan een index op alleen `FastestLapTime`. 
-In de praktijk wordt eerst op een race gefilterd en daarna pas gekeken naar rondetijden. Door deze volgorde in de index aan te 
-houden, wordt de selectiviteit beter en kan de optimizer efficiënter werken. De extra kolommen zorgen ervoor dat de meeste 
+Deze index is gekozen omdat hij beter aansluit op het gebruikspatroon van de queries dan een index op alleen `FastestLapTime`.
+In de praktijk wordt eerst op een race gefilterd en daarna pas gekeken naar rondetijden. Door deze volgorde in de index aan te
+houden, wordt de selectiviteit beter en kan de optimizer efficiënter werken. De extra kolommen zorgen ervoor dat de meeste
 queries volledig uit de index gehaald kunnen worden, zonder extra lookups.
 
 ## Effectiviteit van indexen
@@ -2974,14 +3021,14 @@ worden zijn als volgt: 4, 5, 6 en 7.
 [2026-05-22 14:13:08] 5 rows retrieved starting from 1 in 327 ms (execution: 5 ms, fetching: 322 ms)
 ```
 
-Het belangrijkste verschil dat zichtbaar is geworden, is dat er in plaats van *Full Index Scan*'s op de `Result` tabel
-nu normale *Index Scan* operators worden uitgevoerd, sterker nog, *Index Seek*'s. Deze verandering op zichzelf toont
+Het belangrijkste verschil dat zichtbaar is geworden, is dat er in plaats van _Full Index Scan_'s op de `Result` tabel
+nu normale _Index Scan_ operators worden uitgevoerd, sterker nog, _Index Seek_'s. Deze verandering op zichzelf toont
 al aan dat de index effect heeft, want het aantal rijen dat bekeken wordt neemt drastisch af, ook de manier hoe deze
 benaderd worden is veel efficiënter, namelijk een seek.
 
-Deze verbetering is ook direct terug te zien in de IO en tijd-statistieken. De CPU-tijd is enorm afgenomen, en het 
-aantal logical reads van de result tabel is van ~650 afgenomen naar ~100, het *Scan Count* is daarbij wel toegenomen,
-maar dat zegt niet veel slechts, dit kan gewoon komen omdat het nu gaat over *Index Seeks*, die los worden uitgevoerd,
+Deze verbetering is ook direct terug te zien in de IO en tijd-statistieken. De CPU-tijd is enorm afgenomen, en het
+aantal logical reads van de result tabel is van ~650 afgenomen naar ~100, het _Scan Count_ is daarbij wel toegenomen,
+maar dat zegt niet veel slechts, dit kan gewoon komen omdat het nu gaat over _Index Seeks_, die los worden uitgevoerd,
 deze kunnen opzichzelf heel erg snel zijn.
 
 Concluderend, aan zowel de statistieken als de queryplannen, wordt de index effectief gebruikt.
@@ -3002,7 +3049,7 @@ Concluderend, aan zowel de statistieken als de queryplannen, wordt de index effe
 ```
 
 Aan de alternatieve variant, is er in het executieplan eigenlijk niks veranderd, op de positie van de operator op de
-`Driver` tabel na; wel is ook hier een *Full Index Scan* veranderd naar een *Index Scan* met een *Index Seek*. Dit
+`Driver` tabel na; wel is ook hier een _Full Index Scan_ veranderd naar een _Index Scan_ met een _Index Seek_. Dit
 drukt het aantal rijen die worden bekeken enorm de kop in, en toont ook hier de effectiviteit van de index al aan.
 
 Het aantal logical reads is hier ook sterk afgenomen, van ~300 naar ~50, wat weer een enorme verbetering is.
@@ -3011,11 +3058,10 @@ Verder is er aan de rest van de query vrij weinig veranderd, maar is de effectiv
 #### Verandering voorkeur met onderbouwing
 
 Voor het toepassen van deze index, lag onze voorkeur al op de primaire implementatie, wegens het niet gebruiken van
-spooling en het efficiënter uitlezen van data. Onze voorkeur blijft wederom hetzelfde, met een vergelijkbare 
+spooling en het efficiënter uitlezen van data. Onze voorkeur blijft wederom hetzelfde, met een vergelijkbare
 onderbouwing. De primaire implementatie gebruikt namelijk nog steeds geen spooling, terwijl de alternatieve dat
 nog steeds doet. Dit zorgt voor enorm veel logical reads in de `Worktable`, en daarbij ook veel geheugengebruik en
 mogelijke disk-IO.
-
 
 ### Index op `RaceId` van `DriverStanding`
 
@@ -3074,31 +3120,30 @@ Voor de evaluatie van deze index zal er gekeken worden naar het 7e vraagstuk.
 [2026-05-22 15:06:09] 20 rows retrieved starting from 1 in 318 ms (execution: 3 ms, fetching: 315 ms)
 ```
 
-Een van de eerste en belangrijkste verschillen die zichtbaar is, is dat er na het toevoegen van de index in het 
-executieplan op veel plaatsen geen gebruik meer wordt gemaakt van een *Full Index Scan*, maar in plaats daarvan van 
-een veel efficiëntere *Index Scan*. Verder is bij de lookup van zowel entries uit de `DriverStanding`- als de 
-`Result`-tabellen duidelijk te zien dat de index effect heeft gehad. In plaats van het uitlezen van tienduizenden 
-rijen, worden nu in beide gevallen slechts enkele tientallen relevante rijen gelezen. Dit zorgt voor een drastische 
+Een van de eerste en belangrijkste verschillen die zichtbaar is, is dat er na het toevoegen van de index in het
+executieplan op veel plaatsen geen gebruik meer wordt gemaakt van een _Full Index Scan_, maar in plaats daarvan van
+een veel efficiëntere _Index Scan_. Verder is bij de lookup van zowel entries uit de `DriverStanding`- als de
+`Result`-tabellen duidelijk te zien dat de index effect heeft gehad. In plaats van het uitlezen van tienduizenden
+rijen, worden nu in beide gevallen slechts enkele tientallen relevante rijen gelezen. Dit zorgt voor een drastische
 verlaging van zowel de kosten als de uitvoeringstijd.
 
-De gevallen waarbij nog wel *Full Index Scan*-operators worden gebruikt, zijn niet relevant voor de huidige index en 
-tonen daarom ook niet de effectiviteit ervan aan. De onderdelen waarbij deze index wél relevant is, laten daarentegen 
+De gevallen waarbij nog wel _Full Index Scan_-operators worden gebruikt, zijn niet relevant voor de huidige index en
+tonen daarom ook niet de effectiviteit ervan aan. De onderdelen waarbij deze index wél relevant is, laten daarentegen
 aanzienlijke verbeteringen zien, waaruit geconcludeerd kan worden dat de index effectief is.
 
-Verder is te zien dat er meer gebruik wordt gemaakt van *Nested Loop*-operators in plaats van *Hash Join*-operators. 
-In dit geval is dat een positief teken, omdat de indexen effectief genoeg zijn om een *Hash Join* overbodig te maken; 
+Verder is te zien dat er meer gebruik wordt gemaakt van _Nested Loop_-operators in plaats van _Hash Join_-operators.
+In dit geval is dat een positief teken, omdat de indexen effectief genoeg zijn om een _Hash Join_ overbodig te maken;
 een eenvoudige loop-constructie blijkt hier sneller te zijn.
 
-Tot slot laten ook de IO- en tijdsstatistieken duidelijk verschillen zien. De CPU-tijd is aanzienlijk lager geworden en 
-zowel de `DriverStanding`- als de `Result`-tabel hebben een veel lager aantal *logical reads*. Daarnaast is ook het 
-aantal *physical reads* afgenomen. Hoewel dit aantal eerder al laag was, is het nu teruggebracht van enkele reads 
+Tot slot laten ook de IO- en tijdsstatistieken duidelijk verschillen zien. De CPU-tijd is aanzienlijk lager geworden en
+zowel de `DriverStanding`- als de `Result`-tabel hebben een veel lager aantal _logical reads_. Daarnaast is ook het
+aantal _physical reads_ afgenomen. Hoewel dit aantal eerder al laag was, is het nu teruggebracht van enkele reads
 naar nul.
 
-Wel is het belangrijk om te vermelden dat, door de aanwezigheid van een andere index op `Result`, de 
-optimalisatie niet uitsluitend wordt veroorzaakt door de index op `DriverStanding`. Omdat de lookup op `DriverStanding` 
-echter aanzienlijk efficiënter verloopt, kan alsnog geconcludeerd worden dat deze index effectief is. Tegelijkertijd 
+Wel is het belangrijk om te vermelden dat, door de aanwezigheid van een andere index op `Result`, de
+optimalisatie niet uitsluitend wordt veroorzaakt door de index op `DriverStanding`. Omdat de lookup op `DriverStanding`
+echter aanzienlijk efficiënter verloopt, kan alsnog geconcludeerd worden dat deze index effectief is. Tegelijkertijd
 kan ook de index op `DriverStanding` in deze situatie als effectief worden beschouwd.
-
 
 ##### Alternatieve implementatie
 
@@ -3116,8 +3161,8 @@ kan ook de index op `DriverStanding` in deze situatie als effectief worden besch
 [2026-05-22 15:06:28] 20 rows retrieved starting from 1 in 328 ms (execution: 11 ms, fetching: 317 ms)
 ```
 
-Voor de alternatieve implementatie geld een vergelijkbare uitleg, ook hier is te zien hoe diverse *Full Index Scan*
-operators vervangen worden met betere *Index Scan* operators; waardoor het aantal rijen drastisch verminderd wordt,
+Voor de alternatieve implementatie geld een vergelijkbare uitleg, ook hier is te zien hoe diverse _Full Index Scan_
+operators vervangen worden met betere _Index Scan_ operators; waardoor het aantal rijen drastisch verminderd wordt,
 tegelijkertijd ook weer de kosten en tijd.
 
 Verder is ook bij deze implementatie wederom een enorme verbetering te zien in de IO en tijd statistieken. Het aantal
@@ -3126,7 +3171,7 @@ implementatie is dus het effect van de index enorm duidelijk.
 
 #### Verandering voorkeur met onderbouwing
 
-Waarbij de oorspronkelijke voorkeur lag bij de alternatieve implementatie, die een *Full Index Scan* van de `Result`
+Waarbij de oorspronkelijke voorkeur lag bij de alternatieve implementatie, die een _Full Index Scan_ van de `Result`
 tabel wist te voorkomen (hierdoor gebruikte deze veel minder rijen dan de primaire implementatie), is de vergelijking
 nu wat moeilijker, beide hebben een fantastische performance, en komen ongeveer uit op ~200 logical reads in totaal,
 met een CPU tijd van zo goed als nul. Echter, is het primaire executieplan nu wel iets beter, hij heeft namelijk ~30
@@ -3138,7 +3183,7 @@ code als executieplan), het aantal logical reads ligt ook net iets lager.
 
 ### Index op `RaceId` en `FastestLapTime` van `Result`
 
-Voor de evaluatie van deze index zal er naar de 2e bevraging gekeken worden. Dit is verder ook de enige 
+Voor de evaluatie van deze index zal er naar de 2e bevraging gekeken worden. Dit is verder ook de enige
 bevraging waarop deze index van toepassing is (op basis van de aanbevelingen van SQL-server).
 
 ##### Primaire implementatie
@@ -3193,9 +3238,9 @@ bevraging waarop deze index van toepassing is (op basis van de aanbevelingen van
 ```
 
 Net als bij de andere toevoegingen van indexen, is het effect bij deze vergelijkbaar, de lookups in de `Result` tabel
-zijn van *Full Index Scan*'s naar *Index Scan*, *Index Seek* gegaan; echter, heeft dit niet bepaald geleid tot een
-betere executie. Het aantal logical reads is namelijk sterk toegenomen, zelfs al wordt er nu een betere *Index Seek*
-gebruikt. Dit omdat er toch enorm veel lookups gebeuren in *Nested Loop* structuren, en ook nog dubbel, op twee plekken.
+zijn van _Full Index Scan_'s naar _Index Scan_, _Index Seek_ gegaan; echter, heeft dit niet bepaald geleid tot een
+betere executie. Het aantal logical reads is namelijk sterk toegenomen, zelfs al wordt er nu een betere _Index Seek_
+gebruikt. Dit omdat er toch enorm veel lookups gebeuren in _Nested Loop_ structuren, en ook nog dubbel, op twee plekken.
 
 Zelfs al is de index dus effectief, heeft dit niet tot een betere oplossing geleid; Zelfs nog, deze is ensigns erger
 dan de oorspronkelijke wegens de toename in het aantal logical reads.
@@ -3225,7 +3270,7 @@ kijken hoe de server een beter executieplan kan bepalen.
 ```
 
 Voor deze alternatieve aanpak, is het ook niet helemaal zo als het moet zijn. Er is wel duidelijk dat er gebruik
-gemaakt wordt van de index, maar het blijft nog steeds een *Full Index Scan*, alleen dan niet meer op de primary key,
+gemaakt wordt van de index, maar het blijft nog steeds een _Full Index Scan_, alleen dan niet meer op de primary key,
 maar in plaats daarvan op de nieuwe index. Wel is er in de post-index statistieken te zien dat het aantal logical
 reads op de `Result` tabel gehalveerd is. Dit zou te verklaren zijn omdat er minder key-lookups plaats hoeven te vinden
 wegens de aanwezigheid van veel velden in de index zelf. Dus hierin is een enkele verbetering. Verder is er aan
