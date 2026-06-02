@@ -943,7 +943,7 @@ ORDER BY Coureur;
 
 #### Toelichting
 
-Deze alternatieve query is vrijwel identiek aan de primaire uitwerking, maar voegt een extra filter toe: `WHERE DriverYearRanges.Ranges LIKE '%,%'`. Hiermee worden alleen coureurs getoond die minstens twee losse periodes in hun carrière hebben gehad — oftewel coureurs die een onderbreking hebben gehad en later zijn teruggekeerd.
+Deze alternatieve query is vrijwel identiek aan de primaire uitwerking, maar voegt een extra filter toe: `WHERE DriverYearRanges.Ranges LIKE '%,%'`. Hiermee worden alleen coureurs getoond die minstens twee losse periodes in hun carrière hebben gehad; oftewel coureurs die een onderbreking hebben gehad en later zijn teruggekeerd.
 
 De primaire uitwerking toont álle coureurs, inclusief degenen die één aaneengesloten periode hebben gereden. Met deze `WHERE`-clausule wordt het resultaat beperkt tot enkel de coureurs met een carrièreonderbreking, wat direct antwoord geeft op de oorspronkelijke vraag: "Welke coureurs hebben een periode niet deelgenomen en zijn later teruggekeerd?"
 
@@ -1984,8 +1984,6 @@ applicaties en gebruikers consequent de procedure gebruiken, wat in de praktijk 
 dwingen is. De trigger garandeert dat de constraint altijd wordt gehandhaafd, ongeacht de bron
 van de datawijziging.
 
----
-
 ## Constraint 2: Vanaf seizoen 1979 komt een coureur maximaal één keer voor in de uitslag van een race.
 
 ### AFTER Trigger
@@ -2164,8 +2162,6 @@ database binnenkomt. Bij een stored procedure bestaat het risico dat via een dir
 `UPDATE` alsnog dubbele coureurs in een race terechtkomen. De trigger is de veiligste en meest
 robuuste oplossing.
 
----
-
 ## Constraint 3: Er is een maximum van 25 races per seizoen.
 
 ### AFTER Trigger
@@ -2325,8 +2321,6 @@ de constraint omzeild. De trigger is in dit geval robuuster omdat deze op databa
 garandeert dat de constraint onder alle omstandigheden wordt nageleefd. Zeker bij een harde
 limiet zoals maximaal 25 races per seizoen is het belangrijk dat deze niet onbedoeld omzeild
 kan worden.
-
----
 
 ## Constraint 4: Vanaf seizoen 2014 kan een startnummer per seizoen maar door één coureur worden gebruikt.
 
@@ -2505,16 +2499,12 @@ toepassing de procedures `CreateResultProcedure` en `UpdateResultProcedure` gebr
 praktijk niet te garanderen is. Data-integriteit weegt hier zwaarder dan de extra flexibiliteit
 van een stored procedure.
 
----
-
 ## Constraint 5: Kwalificatie-validatie
 
 Voor constraint 5 (per coureur geldt één van de volgende situaties: alleen Q1, Q1+Q2, of
 Q1+Q2+Q3) is het niet mogelijk gebleken om een werkende AFTER trigger of stored procedure te
 implementeren. De bestaande tabelstructuur biedt onvoldoende kolommen om de kwalificatiefases
 eenduidig te herleiden, waardoor deze constraint niet procedureel afgedwongen kan worden.
-
----
 
 ## Conclusie: Trigger vs. Stored Procedure
 
@@ -2576,8 +2566,6 @@ vallen.
 Hierdoor blijft de combinatie van `RaceId` en `Position` betrouwbaar uniek, ook wanneer meerdere transacties
 gelijktijdig uitgevoerd worden.
 
----
-
 ## Vanaf seizoen 1979 komt een coureur maximaal één keer voor in de uitslag van een race
 
 ### Stored Procedure & Trigger
@@ -2596,8 +2584,6 @@ nieuwe records toevoegen die de validatie beïnvloeden.
 
 Met `SERIALIZABLE` blijven de locks actief tot het einde van de transactie en worden ook nieuwe invoegen binnen
 dezelfde zoekresultaten tegengehouden. Hierdoor blijft de combinatie van `RaceId` en `DriverId` correct uniek.
-
----
 
 ## Er is een maximum van 25 races per seizoen
 
@@ -2619,8 +2605,6 @@ toevoegen binnen hetzelfde seizoen.
 einde van de transactie. Hierdoor kunnen geen extra races worden toegevoegd zolang de controle bezig is.
 
 Op deze manier blijft de limiet van maximaal 25 races per seizoen gegarandeerd behouden.
-
----
 
 ## Vanaf seizoen 2014 kan een startnummer per seizoen maar door één coureur worden gebruikt
 

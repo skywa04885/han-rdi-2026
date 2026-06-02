@@ -25,7 +25,7 @@ jobs:
         with:
           args: >
             README.md
-            -f gfm
+            -f gfm-implicit_figures
             -V geometry:margin=0.5in
             -o public/index.pdf
 
