@@ -1,3 +1,16 @@
+---
+title: Uitwerking RDI Casus
+author:
+  - Luke Rieff
+  - Daniek Roelofs
+subject: Uitwerking RDI casus
+date: \today
+
+titlepage: true
+toc: true
+toc-own-page: true
+---
+
 # Keuze database
 
 In dit project hebben wij ervoor gekozen om de HAN-database te gebruiken. Deze keuze is gemaakt omdat Luke een deel van het vak Advanced Databases al had afgerond en daardoor de nieuwe opdracht niet hoefde uit te voeren. Daarnaast ondervond hij vorig jaar problemen doordat zijn eigen uitwerking niet volledig aansloot bij de opdracht, waardoor bepaalde constraints en queries niet correct konden worden uitgewerkt. Door gebruik te maken van de standaard HAN-database worden deze risico’s vermeden.
