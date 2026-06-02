@@ -23,18 +23,15 @@ jobs:
       - name: Create Pandoc defaults
         run: |
           cat << 'EOF' > pandoc-defaults.yaml
-          pdf-engine: xelatex
           include-in-header:
             - pandoc-header.tex
           EOF
 
           cat << 'EOF' > pandoc-header.tex
-          \usepackage{fvextra}
-          \DefineVerbatimEnvironment{Highlighting}{Verbatim}{
-            breaklines,
-            breakanywhere,
-            commandchars=\\\{\}
-          }
+          \makeatletter
+          \def\verbatim@nolig@list{\do\`\do\<\do\>\do\,\do\'\do\-}
+          \makeatother
+
           \usepackage{graphicx}
           \let\oldincludegraphics\includegraphics
           \renewcommand{\includegraphics}[2][]{\par\oldincludegraphics[#1]{#2}\par}
