@@ -20,12 +20,33 @@ jobs:
       - name: Prepare output folder
         run: mkdir -p public
 
+      - name: Create Pandoc defaults
+        run: |
+          cat << 'EOF' > pandoc-defaults.yaml
+          pdf-engine: xelatex
+          include-in-header:
+            - pandoc-header.tex
+          EOF
+
+          cat << 'EOF' > pandoc-header.tex
+          \usepackage{fvextra}
+          \DefineVerbatimEnvironment{Highlighting}{Verbatim}{
+            breaklines,
+            breakanywhere,
+            commandchars=\\\{\}
+          }
+          \usepackage{graphicx}
+          \let\oldincludegraphics\includegraphics
+          \renewcommand{\includegraphics}[2][]{\par\oldincludegraphics[#1]{#2}\par}
+          EOF
+
       - name: Render README.md to PDF
         uses: docker://pandoc/latex:3.8
         with:
           args: >
             README.md
             -f gfm-implicit_figures
+            --defaults=pandoc-defaults.yaml
             -V geometry:margin=0.5in
             -o public/index.pdf
 
