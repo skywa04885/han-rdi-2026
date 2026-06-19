@@ -4,7 +4,11 @@ author:
   - Student; Luke Rieff (2115557)
   - Student; Daniek Roelofs (1675315)
   - Docent; Bram Laumans
-subject: Uitwerking casus, Klas; ITA-ADB-A-D-f 2025, Groep; 14, Cursus; RDI, Versienummer; 2, Semester; 4 van 25-26
+  - Klas; ITA-ADB-A-D-f 2025
+  - Groep; 14
+  - Cursus; RDI
+  - Versienummer; 2
+  - Semester; 4 van 25-26
 date: \today
 
 titlepage: true
