@@ -1,9 +1,10 @@
 ---
 title: Uitwerking RDI Casus
 author:
-  - Luke Rieff
-  - Daniek Roelofs
-subject: Uitwerking RDI casus
+  - Student; Luke Rieff (2115557)
+  - Student; Daniek Roelofs (1675315)
+  - Docent; Bram Laumans
+subject: Uitwerking casus, Klas; ITA-ADB-A-D-f 2025, Groep; 14, Cursus; RDI, Versienummer; 2, Semester; 4 van 25-26
 date: \today
 
 titlepage: true
@@ -3285,3 +3286,25 @@ heeft de alternatieve implementatie wel de voorkeur dat het aantal reads veel la
 dat op zichzelf ook te betwisten, wegens de hogere CPU-tijd dan de primaire implementatie. Al om al, is dit een
 matige optimalisatie, met twee matige executieplannen, die je beiden eigenlijk liever niet hebt. Er zou dus nader
 onderzoek gedaan moeten worden om deze te verbeteren, de huidige aanpakken (primair en alternatief) volstaan niet.
+
+# Bronnen
+
+1. HAN University of Applied Sciences. *Brightspace – Relationele Databases & Integriteit (RDI)*. Cursusmateriaal, semester 4, studiejaar 2025–2026.
+
+2. W3Schools. *SQL Tutorial*. Geraadpleegd via: https://www.w3schools.com/sql/
+
+3. W3Schools. *SQL Stored Procedures*. Geraadpleegd via: https://www.w3schools.com/sql/sql_stored_procedures.asp
+
+4. SQLServerTutorial.net. *SQL Server Tutorial*. Geraadpleegd via: https://www.sqlservertutorial.net/
+
+5. SQLServerTutorial.net. *SQL Server Triggers*. Geraadpleegd via: https://www.sqlservertutorial.net/sql-server-triggers/
+
+6. Microsoft Learn. *Query Processing Architecture Guide – SQL Server*. Geraadpleegd via: https://learn.microsoft.com/en-us/sql/relational-databases/query-processing-architecture-guide
+
+7. Microsoft Learn. *SQL Server Guides: Query Execution, Indexing, Concurrency and Locking*. Geraadpleegd via: https://learn.microsoft.com/en-us/sql/relational-databases/sql-server-index-design-guide?view=sql-server-ver17
+
+8. GeeksforGeeks. *SQL Indexes*. Geraadpleegd via: https://www.geeksforgeeks.org/sql/sql-indexes/
+
+9. GeeksforGeeks. *Query Processing in SQL*. Geraadpleegd via: https://www.geeksforgeeks.org/sql/sql-query-processing/
+
+10. Guru99. *SQL Server Architecture Explained*. Geraadpleegd via: https://www.guru99.com/sql-server-architecture.html
